@@ -1,0 +1,28 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "description": "Worker for dealing with runpod",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsc && node dist/index.js",
+    "lint": "eslint . -c src/*.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Max Carlson",
+  "license": "Apache 2",
+  "dependencies": {
+    "bullmq": "^5.30.1",
+    "dotenv": "^16.4.7",
+    "runpod-sdk": "^1.0.7",
+    "ts-toolbelt": "^9.6.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@types/node": "^22.10.1",
+    "eslint": "^9.16.0",
+    "globals": "^15.13.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.16.0"
+  }
+}
