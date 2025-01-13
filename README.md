@@ -2,8 +2,8 @@
 
 ## Setup
 
-1. nvm install/use
-2. npm install
+1. `nvm install/use`
+2. `npm install`
 
 ### Install redis
 
@@ -11,7 +11,7 @@
 
 ### Edit .env
 
-Grab the appropriate runpod .env from 1Password
+Grab the appropriate runpod .env from 1Password and save to `.env`
 
 ## Running
 
