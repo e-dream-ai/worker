@@ -10,4 +10,5 @@
 ## Running
 
 1. `npm start` to start the worker(s)
-2. `node dist/prompt.js A Fish in a skyscraper` to execute a job with a prompt
+2. `npm run dev` to recompile/restart on save
+3. `node dist/prompt.js A Fish in a skyscraper` to execute a job with a prompt
