@@ -123,4 +123,5 @@ async function runpodJob(job: Job) {
   }
 }
 
+// run the above function when 'image' job is created (prompt.ts)
 createWorker('image', runpodJob);
