@@ -6,7 +6,7 @@ const redisClient = new Redis({
 });
 
 // Queue to add jobs
-const runpodQueue = new Queue('image', { connection: redisClient });
+const runpodQueue = new Queue('video', { connection: redisClient });
 async function run(prompt: string) {
   return await runpodQueue.addBulk([
     {
@@ -19,7 +19,7 @@ async function run(prompt: string) {
 }
 
 // listen for job events and results. Note that it's best to deal with results directly in the worker
-const queueEvents = new QueueEvents('image');
+const queueEvents = new QueueEvents('video');
 queueEvents.on('completed', async (data) => {
   const job = await Job.fromId(runpodQueue, data.jobId);
   console.log(`Job finished: ${JSON.stringify(job?.returnvalue)}`);
