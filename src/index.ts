@@ -129,6 +129,15 @@ createWorker('image', runpodJob);
 async function videoJob(job: Job) {
   if (endpoint) {
     if (DEBUG) console.log(`Starting runpod worker: ${JSON.stringify(job.data)}`);
+    // serialize prompt json into format expected
+    const json = JSON.stringify(job.data.prompt);
+    const prompt = json.substring(1, json.length - 1);
+
+    const pre_text = job.data.pre_text || 'highly detailed, 4k, masterpiece';
+    const print_output =
+      job.data.print_output || '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot';
+    const frame_count = job.data.frame_count || 300;
+    const frame_rate = job.data.frame_rate || 8;
     const { id } = await endpoint.run({
       input: {
         workflow: {
@@ -234,12 +243,12 @@ async function videoJob(job: Job) {
           },
           '100': {
             inputs: {
-              text: '"0" :"cubist painting of the ayahuasca experience",\n\n"50" :"layered pointillist mitochondria from dreamtime",\n\n"100" :"rave detailed Abstract  spiritual  Paintings",\n\n"150" :"abstract art based on Kabbalah astrological chart",\n\n"200" :"intricate futuristic iridescent multicolored japanese radiolaria",\n\n"250" :"DMT painting android bio nano techno",\n\n"300" :"cubist painting of the ayahuasca experience"\n',
-              max_frames: 300,
-              print_output: '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot',
-              pre_text: 'highly detailed, 4k, masterpiece',
+              text: prompt,
+              max_frames: frame_count,
+              print_output,
+              pre_text,
               app_text: '0',
-              end_frame: 300,
+              end_frame: frame_count,
               start_frame: 0,
               pw_a: 0,
               pw_b: 0,
@@ -256,7 +265,7 @@ async function videoJob(job: Job) {
             inputs: {
               width: 960,
               height: 544,
-              batch_size: 300,
+              batch_size: frame_count,
             },
             class_type: 'ADE_EmptyLatentImageLarge',
             _meta: {
@@ -304,7 +313,7 @@ async function videoJob(job: Job) {
           },
           '106': {
             inputs: {
-              frame_rate: 8,
+              frame_rate,
               loop_count: 0,
               filename_prefix: '1047',
               format: 'video/h264-mp4',

@@ -7,12 +7,24 @@ const redisClient = new Redis({
 
 // Queue to add jobs
 const runpodQueue = new Queue('video', { connection: redisClient });
-async function run(prompt: string) {
-  return await runpodQueue.addBulk([
+async function run(firstFrame: string) {
+  return runpodQueue.addBulk([
     {
       name: 'message',
       data: {
-        prompt,
+        prompt: {
+          '0': firstFrame,
+          '50': 'layered pointillist mitochondria from dreamtime',
+          '100': 'rave detailed Abstract  spiritual  Paintings',
+          '150': 'abstract art based on Kabbalah astrological chart',
+          '200': 'intricate futuristic iridescent multicolored japanese radiolaria',
+          '250': 'DMT painting android bio nano techno',
+          '300': 'cubist painting of the ayahuasca experience',
+        },
+        pre_text: 'highly detailed, 4k, masterpiece',
+        print_output: '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot',
+        frame_count: 24,
+        frame_rate: 8,
       },
     },
   ]);
