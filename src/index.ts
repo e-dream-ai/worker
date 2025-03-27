@@ -346,8 +346,13 @@ async function videoJob(job: Job) {
       }
     } while (status.completed === false);
 
-    // return S3 url to result
-    return JSON.parse(JSON.stringify(status))?.output?.message;
+    const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
+    if (!s3url) {
+      throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
+    } else {
+      // return S3 url to result
+      return s3url;
+    }
   }
 }
 
