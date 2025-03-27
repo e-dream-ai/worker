@@ -7,19 +7,19 @@ const redisClient = new Redis({
 
 // Queue to add jobs
 const runpodQueue = new Queue('video', { connection: redisClient });
-async function run(firstFrame: string) {
+async function run(firstFrame) {
   return runpodQueue.addBulk([
     {
       name: 'message',
       data: {
         prompt: {
-          '0': firstFrame,
+          '0': firstFrame || 'cubist painting of the ayahuasca experience',
           '50': 'layered pointillist mitochondria from dreamtime',
           '100': 'rave detailed Abstract  spiritual  Paintings',
           '150': 'abstract art based on Kabbalah astrological chart',
           '200': 'intricate futuristic iridescent multicolored japanese radiolaria',
           '250': 'DMT painting android bio nano techno',
-          '300': 'cubist painting of the ayahuasca experience',
+          '300': firstFrame || 'cubist painting of the ayahuasca experience',
         },
         pre_text: 'highly detailed, 4k, masterpiece',
         print_output: '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot',
