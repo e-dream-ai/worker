@@ -30,7 +30,7 @@ function createWorker(name: string, handler) {
   );
 
   worker.on('failed', (job, error: Error) => {
-    console.error(`Worker failed: ${name} error: ${serializeError(error)}, job data: ${JSON.stringify(job?.toJSON())}`);
+    console.error(`Job failed: ${name} error: ${serializeError(error)}, job data: ${JSON.stringify(job?.toJSON())}`);
   });
 
   worker.on('completed', (job, returnvalue) => {
@@ -134,11 +134,13 @@ async function videoJob(job: Job) {
     const json = JSON.stringify(job.data.prompt);
     const prompt = json.substring(1, json.length - 1);
 
-    const pre_text = job.data.pre_text || 'highly detailed, 4k, masterpiece';
-    const print_output =
+    const pre_text: string = job.data.pre_text || 'highly detailed, 4k, masterpiece';
+    const print_output: string =
       job.data.print_output || '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot';
-    const frame_count = job.data.frame_count || 300;
-    const frame_rate = job.data.frame_rate || 8;
+    const frame_count: number = job.data.frame_count || 64;
+    const frame_rate: number = job.data.frame_rate || 8;
+    const filename_prefix: string = job.id + '';
+
     const { id } = await endpoint.run({
       input: {
         workflow: {
@@ -203,7 +205,7 @@ async function videoJob(job: Job) {
           },
           '12': {
             inputs: {
-              filename_prefix: '1047',
+              filename_prefix,
               images: ['10', 0],
             },
             class_type: 'SaveImage',
@@ -316,7 +318,7 @@ async function videoJob(job: Job) {
             inputs: {
               frame_rate,
               loop_count: 0,
-              filename_prefix: '1047',
+              filename_prefix,
               format: 'video/h264-mp4',
               pix_fmt: 'yuv420p',
               crf: 19,
@@ -342,10 +344,10 @@ async function videoJob(job: Job) {
       if (status.status === 'FAILED') {
         throw new Error(JSON.stringify(status));
       }
-    } while (status.status !== 'COMPLETED');
+    } while (status.completed === false);
 
     // return S3 url to result
-    return JSON.parse(JSON.stringify(status)).output.message;
+    return JSON.parse(JSON.stringify(status))?.output?.message;
   }
 }
 
