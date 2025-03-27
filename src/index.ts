@@ -338,7 +338,12 @@ async function videoJob(job: Job) {
 
     let status;
     do {
-      status = await endpoint.status(id);
+      try {
+        status = await endpoint.status(id);
+      } catch (e) {
+        console.log('error getting endpoint status', e);
+        continue;
+      }
       if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
       await job.updateProgress(status);
       if (status.status === 'FAILED') {
