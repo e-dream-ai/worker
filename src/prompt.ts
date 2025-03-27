@@ -46,8 +46,13 @@ queueEvents.on('completed', async (data) => {
   console.log(`Job finished: ${JSON.stringify(job?.returnvalue)}`);
   process.exit();
 });
-queueEvents.on('progress', (data) => {
-  console.log(`Job progress: ${JSON.stringify(data)}`);
+queueEvents.on('progress', async (data) => {
+  const job = await Job.fromId(runpodQueue, data.jobId);
+  console.log(`Job progress: ${JSON.stringify(data)} for job ${JSON.stringify(job)}`);
+});
+queueEvents.on('failed', async (data) => {
+  const job = await Job.fromId(runpodQueue, data.jobId);
+  console.log(`Job failed:   ${job.failedReason} for job ${JSON.stringify(job)}`);
 });
 
 if (process.argv.length === 2) {
