@@ -1,4 +1,4 @@
-import { Job, Worker } from 'bullmq';
+import { Job, Queue, Worker } from 'bullmq';
 import 'dotenv/config';
 import { Redis } from 'ioredis';
 import runpodSdk from 'runpod-sdk';
@@ -47,7 +47,7 @@ function createWorker(name: string, handler) {
 
 async function runpodJob(job: Job) {
   if (endpoint) {
-    if (DEBUG) console.log(`Starting runpod worker: ${JSON.stringify(job.data)}`);
+    if (DEBUG) console.log(`Starting runpod image worker: ${JSON.stringify(job.data)}`);
     const { id } = await endpoint.run({
       input: {
         workflow: {
@@ -129,7 +129,7 @@ createWorker('image', runpodJob);
 
 async function videoJob(job: Job) {
   if (endpoint) {
-    if (DEBUG) console.log(`Starting runpod worker: ${JSON.stringify(job.data)}`);
+    if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
     // serialize prompt json into format expected
     const json = JSON.stringify(job.data.prompt);
     const prompt = json.substring(1, json.length - 1);
@@ -340,16 +340,15 @@ async function videoJob(job: Job) {
     do {
       try {
         status = await endpoint.status(id);
+        if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
+        await job.updateProgress(status);
+        if (status.status === 'FAILED') {
+          throw new Error(JSON.stringify(status));
+        }
       } catch (e) {
-        console.log('error getting endpoint status', e);
-        continue;
+        console.error('error getting endpoint status', e);
       }
-      if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
-      await job.updateProgress(status);
-      if (status.status === 'FAILED') {
-        throw new Error(JSON.stringify(status));
-      }
-    } while (status.completed === false);
+    } while (status?.completed === false);
 
     const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
     if (!s3url) {
@@ -363,3 +362,8 @@ async function videoJob(job: Job) {
 
 // run the above function when 'image' job is created (prompt.ts)
 createWorker('video', videoJob);
+
+const videoQueue = new Queue('video');
+
+const jobs = await videoQueue.getJobs(['active']);
+console.log(`Active jobs, ${JSON.stringify(jobs)}`);
