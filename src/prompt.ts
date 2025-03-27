@@ -5,8 +5,17 @@ const redisClient = new Redis({
   maxRetriesPerRequest: null,
 });
 
-// Queue to add jobs
-const runpodQueue = new Queue('video', { connection: redisClient });
+const runpodQueue = new Queue('video', {
+  connection: redisClient,
+  defaultJobOptions: {
+    attempts: 1,
+    backoff: {
+      type: 'exponential',
+      delay: 1000,
+    },
+  },
+});
+
 async function run(firstFrame) {
   return runpodQueue.addBulk([
     {
