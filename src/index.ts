@@ -45,16 +45,21 @@ function createWorker(name: string, handler) {
   });
 }
 
-async function runpodJob(job: Job) {
+async function imageJob(job: Job) {
   if (endpoint) {
     if (DEBUG) console.log(`Starting runpod image worker: ${JSON.stringify(job.data)}`);
+    const prompt = job.data.prompt || 'A walk in the park';
+    const seed: number = job.data.seed || 1337;
+    const steps: number = job.data.steps || 20;
+    const filename_prefix: string = job.id + '';
+
     const { id } = await endpoint.run({
       input: {
         workflow: {
           '3': {
             inputs: {
-              seed: 1337,
-              steps: 20,
+              seed,
+              steps,
               cfg: 8,
               sampler_name: 'euler',
               scheduler: 'normal',
@@ -82,7 +87,7 @@ async function runpodJob(job: Job) {
           },
           '6': {
             inputs: {
-              text: job.data.prompt,
+              text: prompt,
               clip: ['4', 1],
             },
             class_type: 'CLIPTextEncode',
@@ -103,7 +108,7 @@ async function runpodJob(job: Job) {
           },
           '9': {
             inputs: {
-              filename_prefix: 'ComfyUI',
+              filename_prefix,
               images: ['8', 0],
             },
             class_type: 'SaveImage',
@@ -114,18 +119,30 @@ async function runpodJob(job: Job) {
 
     let status;
     do {
-      status = await endpoint.status(id);
-      if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
-      await job.updateProgress(status);
-    } while (status.status !== 'COMPLETED');
+      try {
+        status = await endpoint.status(id);
+        if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
+        await job.updateProgress(status);
+        if (status.status === 'FAILED') {
+          throw new Error(JSON.stringify(status));
+        }
+      } catch (e) {
+        console.error('error getting endpoint status', e.message);
+      }
+    } while (status?.completed === false);
 
-    // return S3 url to result
-    return JSON.parse(JSON.stringify(status)).output.message;
+    const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
+    if (!s3url) {
+      throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
+    } else {
+      // return S3 url to result
+      return s3url;
+    }
   }
 }
 
 // run the above function when 'image' job is created (prompt.ts)
-createWorker('image', runpodJob);
+createWorker('image', imageJob);
 
 async function videoJob(job: Job) {
   if (endpoint) {
@@ -133,13 +150,16 @@ async function videoJob(job: Job) {
     // serialize prompt json into format expected
     const json = JSON.stringify(job.data.prompt);
     const prompt = json.substring(1, json.length - 1);
+    const seed: number = job.data.seed || 832386334143550;
+    const steps: number = job.data.steps || 30;
+    const filename_prefix: string = job.id + '';
 
     const pre_text: string = job.data.pre_text || 'highly detailed, 4k, masterpiece';
     const print_output: string =
       job.data.print_output || '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot';
     const frame_count: number = job.data.frame_count || 64;
     const frame_rate: number = job.data.frame_rate || 8;
-    const filename_prefix: string = job.id + '';
+    const motion_scale: number = job.data.motion_scale || 1;
 
     const { id } = await endpoint.run({
       input: {
@@ -177,8 +197,8 @@ async function videoJob(job: Job) {
           },
           '7': {
             inputs: {
-              seed: 832386334143550,
-              steps: 30,
+              seed,
+              steps,
               cfg: 5,
               sampler_name: 'dpmpp_2m_sde',
               scheduler: 'karras',
@@ -217,7 +237,7 @@ async function videoJob(job: Job) {
             inputs: {
               model_name: 'sd1/mm_sd_v15_v2.ckpt',
               beta_schedule: 'sqrt_linear (AnimateDiff)',
-              motion_scale: 1,
+              motion_scale,
               apply_v2_models_properly: true,
               model: ['1', 0],
               context_options: ['94', 0],
@@ -289,7 +309,7 @@ async function videoJob(job: Job) {
           '103': {
             inputs: {
               seed: 832386334143550,
-              steps: 30,
+              steps,
               cfg: 5,
               sampler_name: 'dpmpp_2m_sde',
               scheduler: 'karras',
@@ -346,7 +366,7 @@ async function videoJob(job: Job) {
           throw new Error(JSON.stringify(status));
         }
       } catch (e) {
-        console.error('error getting endpoint status', e);
+        console.error('error getting endpoint status', e.message);
       }
     } while (status?.completed === false);
 
