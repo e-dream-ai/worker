@@ -329,6 +329,9 @@ async function videoJob(job: Job) {
       status = await endpoint.status(id);
       if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
       await job.updateProgress(status);
+      if (status.status === 'FAILED') {
+        throw new Error(JSON.stringify(status));
+      }
     } while (status.status !== 'COMPLETED');
 
     // return S3 url to result
