@@ -25,6 +25,7 @@ function createWorker(name: string, handler) {
     },
     {
       connection: redisClient,
+      stalledInterval: 1200 * 1000,
     }
   );
 
