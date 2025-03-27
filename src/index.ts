@@ -1,5 +1,9 @@
+import { createBullBoard } from '@bull-board/api';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter.js';
+import { ExpressAdapter } from '@bull-board/express';
 import { Job, Queue, Worker } from 'bullmq';
 import 'dotenv/config';
+import express from 'express';
 import { Redis } from 'ioredis';
 import runpodSdk from 'runpod-sdk';
 
@@ -384,6 +388,27 @@ async function videoJob(job: Job) {
 createWorker('video', videoJob);
 
 const videoQueue = new Queue('video');
+const imageQueue = new Queue('image');
 
 const jobs = await videoQueue.getJobs(['active']);
 console.log(`Active jobs, ${JSON.stringify(jobs)}`);
+
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath('/admin/queues');
+
+createBullBoard({
+  queues: [new BullMQAdapter(videoQueue), new BullMQAdapter(imageQueue)],
+  serverAdapter: serverAdapter,
+});
+
+const app = express();
+
+app.use('/admin/queues', serverAdapter.getRouter());
+
+// other configurations of your server
+
+app.listen(3000, () => {
+  console.log('Running on 3000...');
+  console.log('For the UI, open http://localhost:3000/admin/queues');
+  console.log('Make sure Redis is running on port 6379 by default');
+});
