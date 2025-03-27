@@ -239,6 +239,7 @@ async function videoJob(job: Job) {
               print_output: '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot',
               pre_text: 'highly detailed, 4k, masterpiece',
               app_text: '0',
+              end_frame: 300,
               start_frame: 0,
               pw_a: 0,
               pw_b: 0,
