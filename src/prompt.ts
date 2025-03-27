@@ -35,6 +35,7 @@ const queueEvents = new QueueEvents('video');
 queueEvents.on('completed', async (data) => {
   const job = await Job.fromId(runpodQueue, data.jobId);
   console.log(`Job finished: ${JSON.stringify(job?.returnvalue)}`);
+  process.exit();
 });
 queueEvents.on('progress', (data) => {
   console.log(`Job progress: ${JSON.stringify(data)}`);
