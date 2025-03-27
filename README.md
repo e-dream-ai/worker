@@ -7,9 +7,12 @@
 3. `npm install`
 4. `brew install redis`
 5. Grab the appropriate runpod .env from 1Password and save to `.env`
+6. `npm run build`
 
 ## Running
 
 1. `nvm use`
-2. `npm start` to start the worker or use `npm run dev` to recompile/restart automatically
-3. `node dist/prompt.js A Fish in a skyscraper` to execute a job with a prompt
+2. `node dist/index.js &` to start the worker
+3. `node dist/prompt.js A fish on a bicycle` to execute a job with a prompt, or `node dist/prompt.js keyframe1, keyframe2, keyframe3` to replace multiple keyframes with comma-separated values
+
+It's also possible to use `npm run dev` to recompile/restart automatically, but NOTE: restarting the worker doesn't yet monitor existing jobs
