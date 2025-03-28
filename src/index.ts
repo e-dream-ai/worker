@@ -49,6 +49,36 @@ function createWorker(name: string, handler) {
   });
 }
 
+async function handleStatus(id, job: Job) {
+  let status;
+  let lastStatus = '';
+  do {
+    try {
+      status = await endpoint.status(id);
+      await job.updateProgress(status);
+      const json = `Got status ${JSON.stringify(status)}`;
+      if (lastStatus !== json) {
+        lastStatus = json;
+        if (DEBUG) console.log(`Got status: ${json}`);
+        await job.log(`${new Date().toISOString()}: ${json}`);
+      }
+      if (status.status === 'FAILED') {
+        throw new Error(JSON.stringify(status));
+      }
+    } catch (e) {
+      console.error('error getting endpoint status', e.message);
+    }
+  } while (status?.completed === false);
+
+  const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
+  if (!s3url) {
+    throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
+  } else {
+    // return S3 url to result
+    return s3url;
+  }
+}
+
 async function imageJob(job: Job) {
   if (endpoint) {
     if (DEBUG) console.log(`Starting runpod image worker: ${JSON.stringify(job.data)}`);
@@ -121,27 +151,7 @@ async function imageJob(job: Job) {
       },
     });
 
-    let status;
-    do {
-      try {
-        status = await endpoint.status(id);
-        if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
-        await job.updateProgress(status);
-        if (status.status === 'FAILED') {
-          throw new Error(JSON.stringify(status));
-        }
-      } catch (e) {
-        console.error('error getting endpoint status', e.message);
-      }
-    } while (status?.completed === false);
-
-    const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
-    if (!s3url) {
-      throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
-    } else {
-      // return S3 url to result
-      return s3url;
-    }
+    return handleStatus(id, job);
   }
 }
 
@@ -360,27 +370,7 @@ async function videoJob(job: Job) {
       },
     });
 
-    let status;
-    do {
-      try {
-        status = await endpoint.status(id);
-        if (DEBUG) console.log(`Got status: ${JSON.stringify(status)}`);
-        await job.updateProgress(status);
-        if (status.status === 'FAILED') {
-          throw new Error(JSON.stringify(status));
-        }
-      } catch (e) {
-        console.error('error getting endpoint status', e.message);
-      }
-    } while (status?.completed === false);
-
-    const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
-    if (!s3url) {
-      throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
-    } else {
-      // return S3 url to result
-      return s3url;
-    }
+    return handleStatus(id, job);
   }
 }
 
