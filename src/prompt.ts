@@ -2,6 +2,8 @@ import { Job, Queue, QueueEvents } from 'bullmq';
 import { Redis } from 'ioredis';
 
 const redisClient = new Redis({
+  host: 'localhost',
+  port: 6379,
   maxRetriesPerRequest: null,
 });
 
@@ -32,10 +34,10 @@ async function runVideo(frames: string[]) {
       },
       pre_text: 'highly detailed, 4k, masterpiece',
       print_output: '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot',
-      frame_count: 608, // should be a multiple of the context window of 16
-      frame_rate: 16,
+      frame_count: 16, // should be a multiple of the context window of 16
+      frame_rate: 8,
       seed: 832386334143550,
-      steps: 30,
+      steps: 15,
       motion_scale: 1,
     },
   };

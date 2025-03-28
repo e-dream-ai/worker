@@ -14,6 +14,8 @@ const runpod = runpodSdk(RUNPOD_API_KEY || '');
 const endpoint = runpod.endpoint(ENDPOINT_ID || '');
 
 const redisClient = new Redis({
+  host: 'localhost',
+  port: 6379,
   maxRetriesPerRequest: null,
 });
 
