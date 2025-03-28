@@ -22,18 +22,21 @@ async function runVideo(frames: string[]) {
     name: 'message',
     data: {
       prompt: {
-        '0': frames[0] || 'cubist painting of the ayahuasca experience',
-        '50': frames[1] || 'layered pointillist mitochondria from dreamtime',
-        '100': frames[2] || 'rave detailed Abstract  spiritual  Paintings',
-        '150': frames[3] || 'abstract art based on Kabbalah astrological chart',
-        '200': frames[4] || 'intricate futuristic iridescent multicolored japanese radiolaria',
-        '250': frames[5] || 'DMT painting android bio nano techno',
-        '304': frames[0] || 'cubist painting of the ayahuasca experience',
+        '0': frames[0]?.trim() || 'cubist painting of the ayahuasca experience',
+        '100': frames[1]?.trim() || 'layered pointillist mitochondria from dreamtime',
+        '200': frames[2]?.trim() || 'rave detailed Abstract  spiritual  Paintings',
+        '300': frames[3]?.trim() || 'abstract art based on Kabbalah astrological chart',
+        '400': frames[4]?.trim() || 'intricate futuristic iridescent multicolored japanese radiolaria',
+        '500': frames[5]?.trim() || 'DMT painting android bio nano techno',
+        '608': frames[6]?.trim() || frames[0]?.trim() || 'cubist painting of the ayahuasca experience',
       },
       pre_text: 'highly detailed, 4k, masterpiece',
       print_output: '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot',
-      frame_count: 304, // should be a multiple of the context window of 16
-      frame_rate: 8,
+      frame_count: 608, // should be a multiple of the context window of 16
+      frame_rate: 16,
+      seed: 832386334143550,
+      steps: 30,
+      motion_scale: 1,
     },
   };
 
@@ -45,14 +48,15 @@ async function runVideo(frames: string[]) {
 const queueEvents = new QueueEvents('video');
 queueEvents.on('completed', async (data) => {
   const job = await Job.fromId(videoQueue, data.jobId);
-  console.log(`Job finished: ${JSON.stringify(job?.returnvalue)} for job ${JSON.stringify(job)}`);
-  process.exit();
+  console.log(
+    `\n${new Date().toISOString()}: Job finished: ${JSON.stringify(job?.returnvalue)} for job ${JSON.stringify(job)}`
+  );
 });
 let lastprogress = '';
 queueEvents.on('progress', (data) => {
   const progress = JSON.stringify(data);
   if (lastprogress != progress) {
-    console.log(`Job progress: ${progress}`);
+    console.log(`\n${new Date().toISOString()}: Job progress: ${progress}`);
     lastprogress = progress;
   } else {
     process.stdout.write('.');
@@ -60,7 +64,7 @@ queueEvents.on('progress', (data) => {
 });
 queueEvents.on('failed', async (data) => {
   const job = await Job.fromId(videoQueue, data.jobId);
-  console.log(`Job failed:   ${job.failedReason} for job ${JSON.stringify(job)}`);
+  console.log(`\n${new Date().toISOString()}: Job failed:   ${job.failedReason} for job ${JSON.stringify(job)}`);
 });
 
 if (process.argv.length === 2) {
