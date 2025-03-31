@@ -29,7 +29,7 @@ function createWorker(name: string, handler) {
     },
     {
       connection: redisClient,
-      stalledInterval: 1200 * 1000,
+      // stalledInterval: 1200 * 1000,
     }
   );
 
