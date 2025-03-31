@@ -175,7 +175,7 @@ async function videoJob(job: Job) {
     const frame_rate: number = job.data.frame_rate || 8;
     const motion_scale: number = job.data.motion_scale || 1;
 
-    const { id } = await endpoint.run({
+    const { id: runpod_id } = await endpoint.run({
       input: {
         workflow: {
           '1': {
@@ -370,7 +370,8 @@ async function videoJob(job: Job) {
       },
     });
 
-    return handleStatus(id, job);
+    await job.updateData({ ...job.data, runpod_id });
+    return handleStatus(runpod_id, job);
   }
 }
 

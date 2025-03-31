@@ -37,6 +37,7 @@ async function runVideo(frames: string[]) {
       seed: 832386334143550,
       steps: 30,
       motion_scale: 1,
+      runpod_id: null,
     },
   };
 
