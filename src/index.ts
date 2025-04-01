@@ -86,6 +86,7 @@ async function imageJob(job: Job) {
     const seed: number = job.data.seed || 1337;
     const steps: number = job.data.steps || 20;
     const filename_prefix: string = job.id + '';
+    const size = { width: job.data.width || 512, height: job.data.height || 512 };
 
     const { id } = await endpoint.run({
       input: {
@@ -113,8 +114,8 @@ async function imageJob(job: Job) {
           },
           '5': {
             inputs: {
-              width: 512,
-              height: 512,
+              width: size.width,
+              height: size.height,
               batch_size: 1,
             },
             class_type: 'EmptyLatentImage',
@@ -167,6 +168,7 @@ async function videoJob(job: Job) {
     const seed: number = job.data.seed || 832386334143550;
     const steps: number = job.data.steps || 30;
     const filename_prefix: string = job.id + '';
+    const size = { width: job.data.width || 960, height: job.data.height || 544 };
 
     const pre_text: string = job.data.pre_text || 'highly detailed, 4k, masterpiece';
     const print_output: string =
@@ -300,8 +302,8 @@ async function videoJob(job: Job) {
           },
           '101': {
             inputs: {
-              width: 960,
-              height: 544,
+              width: size.width,
+              height: size.height,
               batch_size: frame_count,
             },
             class_type: 'ADE_EmptyLatentImageLarge',
