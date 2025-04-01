@@ -49,12 +49,12 @@ function createWorker(name: string, handler) {
   });
 }
 
-async function handleStatus(id, job: Job) {
+async function handleStatus(runpod_id, job: Job) {
   let status;
   let lastStatus = '';
   do {
     try {
-      status = await endpoint.status(id);
+      status = await endpoint.status(runpod_id);
       await job.updateProgress(status);
       const json = `Got status ${JSON.stringify(status)}`;
       if (lastStatus !== json) {
@@ -88,7 +88,7 @@ async function imageJob(job: Job) {
     const filename_prefix: string = job.id + '';
     const size = { width: job.data.width || 512, height: job.data.height || 512 };
 
-    const { id } = await endpoint.run({
+    const { id: runpod_id } = await endpoint.run({
       input: {
         workflow: {
           '3': {
@@ -152,7 +152,8 @@ async function imageJob(job: Job) {
       },
     });
 
-    return handleStatus(id, job);
+    await job.updateData({ ...job.data, runpod_id });
+    return handleStatus(runpod_id, job);
   }
 }
 
