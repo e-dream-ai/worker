@@ -11,9 +11,9 @@ export const env = cleanEnv(process.env, {
    */
   // REDISCLOUD_URL is set by heroku automatically
   REDISCLOUD_URL: str({ devDefault: '' }),
-  REDIS_HOST: str({ devDefault: 'localhost' }),
-  REDIS_PORT: port({ devDefault: 6379 }),
-  REDIS_PASSWORD: str({ devDefault: '' }),
+  REDIS_HOST: str({ default: 'localhost' }),
+  REDIS_PORT: port({ default: 6379 }),
+  REDIS_PASSWORD: str({ default: '' }),
 
   RUNPOD_API_KEY: str(),
   RUNPOD_ENDPOINT_ID: str(),
