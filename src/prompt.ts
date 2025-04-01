@@ -1,9 +1,5 @@
 import { Job, Queue, QueueEvents } from 'bullmq';
-import { Redis } from 'ioredis';
-
-const redisClient = new Redis({
-  maxRetriesPerRequest: null,
-});
+import redisClient from './shared/redis.js';
 
 const videoQueue = new Queue('video', {
   connection: redisClient,

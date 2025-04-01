@@ -4,18 +4,14 @@ import { ExpressAdapter } from '@bull-board/express';
 import { Job, Queue, Worker } from 'bullmq';
 import 'dotenv/config';
 import express from 'express';
-import { Redis } from 'ioredis';
 import runpodSdk from 'runpod-sdk';
+import env from './shared/env.js';
+import redisClient from './shared/redis.js';
 
-const DEBUG = false;
+const DEBUG = env.DEBUG;
 
-const { RUNPOD_API_KEY, ENDPOINT_ID } = process.env;
-const runpod = runpodSdk(RUNPOD_API_KEY || '');
-const endpoint = runpod.endpoint(ENDPOINT_ID || '');
-
-const redisClient = new Redis({
-  maxRetriesPerRequest: null,
-});
+const runpod = runpodSdk(env.RUNPOD_API_KEY);
+const endpoint = runpod.endpoint(env.RUNPOD_ENDPOINT_ID);
 
 const serializeError = (error: Error) => {
   return JSON.stringify(error, Object.getOwnPropertyNames(error));
@@ -401,8 +397,7 @@ app.use('/admin/queues', serverAdapter.getRouter());
 
 // other configurations of your server
 
-app.listen(3000, () => {
-  console.log('Running on 3000...');
-  console.log('For the UI, open http://localhost:3000/admin/queues');
-  console.log('Make sure Redis is running on port 6379 by default');
+app.listen(env.PORT, () => {
+  console.log(`Running on port ${env.PORT} in ${env.NODE_ENV} mode...`);
+  console.log(`For the UI, open http://localhost:${env.PORT}/admin/queues`);
 });
