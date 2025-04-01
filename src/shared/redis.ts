@@ -12,4 +12,6 @@ const redisClient = env.REDISCLOUD_URL
       maxRetriesPerRequest: null,
     });
 
+if (env.DEBUG) console.log('redisClient', env.REDISCLOUD_URL, redisClient);
+
 export default redisClient;
