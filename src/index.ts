@@ -377,8 +377,12 @@ async function videoJob(job: Job) {
 // run the above function when 'image' job is created (prompt.ts)
 createWorker('video', videoJob);
 
-const videoQueue = new Queue('video');
-const imageQueue = new Queue('image');
+const videoQueue = new Queue('video', {
+  connection: redisOptions,
+});
+const imageQueue = new Queue('image', {
+  connection: redisOptions,
+});
 
 const jobs = await videoQueue.getJobs(['active']);
 console.log(`Active jobs, ${JSON.stringify(jobs)}`);
