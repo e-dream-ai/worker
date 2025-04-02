@@ -4,6 +4,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import { Job, Queue, Worker } from 'bullmq';
 import 'dotenv/config';
 import express from 'express';
+import basicAuth from 'express-basic-auth';
 import runpodSdk from 'runpod-sdk';
 import env from './shared/env.js';
 import redisClient from './shared/redis.js';
@@ -396,7 +397,13 @@ createBullBoard({
 });
 
 const app = express();
-
+app.use(
+  '/admin',
+  basicAuth({
+    users: { admin: env.ADMIN_PASS },
+    challenge: true,
+  })
+);
 app.use('/admin/queues', serverAdapter.getRouter());
 
 // other configurations of your server

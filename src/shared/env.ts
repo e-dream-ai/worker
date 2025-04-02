@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { bool, cleanEnv, port, str } from 'envalid';
 
 export const env = cleanEnv(process.env, {
-  NODE_ENV: str({ devDefault: 'debug' }),
+  NODE_ENV: str({ choices: ['development', 'test', 'production', 'stage'] }),
   PORT: port({ default: 3000 }),
   DEBUG: bool({ default: false }),
 
@@ -17,6 +17,8 @@ export const env = cleanEnv(process.env, {
 
   RUNPOD_API_KEY: str(),
   RUNPOD_ENDPOINT_ID: str(),
+
+  ADMIN_PASS: str(),
 });
 
 export default env;
