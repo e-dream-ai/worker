@@ -4,6 +4,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import { Job, Queue, Worker } from 'bullmq';
 import 'dotenv/config';
 import express from 'express';
+import basicAuth from 'express-basic-auth';
 import runpodSdk from 'runpod-sdk';
 import env from './shared/env.js';
 import redisClient from './shared/redis.js';
@@ -377,8 +378,12 @@ async function videoJob(job: Job) {
 // run the above function when 'image' job is created (prompt.ts)
 createWorker('video', videoJob);
 
-const videoQueue = new Queue('video');
-const imageQueue = new Queue('image');
+const videoQueue = new Queue('video', {
+  connection: redisClient,
+});
+const imageQueue = new Queue('image', {
+  connection: redisClient,
+});
 
 const jobs = await videoQueue.getJobs(['active']);
 console.log(`Active jobs, ${JSON.stringify(jobs)}`);
@@ -392,7 +397,13 @@ createBullBoard({
 });
 
 const app = express();
-
+app.use(
+  '/admin',
+  basicAuth({
+    users: { admin: env.ADMIN_PASS },
+    challenge: true,
+  })
+);
 app.use('/admin/queues', serverAdapter.getRouter());
 
 // other configurations of your server
