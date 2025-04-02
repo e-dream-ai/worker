@@ -6,7 +6,7 @@ import 'dotenv/config';
 import express from 'express';
 import runpodSdk from 'runpod-sdk';
 import env from './shared/env.js';
-import { redisOptions } from './shared/redis.js';
+import redisClient from './shared/redis.js';
 
 const DEBUG = env.DEBUG;
 
@@ -24,7 +24,7 @@ function createWorker(name: string, handler) {
       return await handler(job);
     },
     {
-      connection: redisOptions,
+      connection: redisClient,
       // stalledInterval: 1200 * 1000,
     }
   );
@@ -378,10 +378,10 @@ async function videoJob(job: Job) {
 createWorker('video', videoJob);
 
 const videoQueue = new Queue('video', {
-  connection: redisOptions,
+  connection: redisClient,
 });
 const imageQueue = new Queue('image', {
-  connection: redisOptions,
+  connection: redisClient,
 });
 
 const jobs = await videoQueue.getJobs(['active']);
