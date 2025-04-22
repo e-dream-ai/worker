@@ -378,7 +378,104 @@ async function videoJob(job: Job) {
 // run the above function when 'image' job is created (prompt.ts)
 createWorker('video', videoJob);
 
-const videoQueue = new Queue('video', {
+async function videoJobHunyuan(job: Job) {
+  if (endpoint) {
+    if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
+    // serialize prompt json into format expected
+    const json = JSON.stringify(job.data.prompt);
+    const prompt = json.substring(1, json.length - 1);
+
+    const { id: runpod_id } = await endpoint.run({
+      input: {
+        workflow: {
+          '1': {
+            inputs: {
+              model: 'hunyuan_video_720_cfgdistill_bf16.safetensors',
+              base_precision: 'bf16',
+              quantization: 'fp8_e4m3fn',
+              load_device: 'offload_device',
+              attention_mode: 'sageattn_varlen',
+            },
+            class_type: 'HyVideoModelLoader',
+          },
+          '3': {
+            inputs: {
+              width: 640,
+              height: 368,
+              num_frames: 85,
+              steps: 30,
+              embedded_guidance_scale: 6,
+              flow_shift: 9,
+              seed: 6,
+              force_offload: 1,
+              denoise_strength: 1,
+              model: ['1', 0],
+              hyvid_embeds: ['30', 0],
+            },
+            class_type: 'HyVideoSampler',
+          },
+          '5': {
+            inputs: {
+              enable_vae_tiling: true,
+              temporal_tiling_sample_size: 8,
+              vae: ['7', 0],
+              samples: ['3', 0],
+            },
+            class_type: 'HyVideoDecode',
+          },
+          '7': {
+            inputs: {
+              model_name: 'hunyuan_video_vae_bf16.safetensors',
+              precision: 'fp16',
+            },
+            class_type: 'HyVideoVAELoader',
+          },
+          '16': {
+            inputs: {
+              llm_model: 'Kijai/llava-llama-3-8b-text-encoder-tokenizer',
+              clip_model: 'openai/clip-vit-large-patch14',
+              precision: 'fp16',
+              apply_final_norm: false,
+              hidden_state_skip_layer: 2,
+            },
+            class_type: 'DownloadAndLoadHyVideoTextEncoder',
+          },
+          '30': {
+            inputs: {
+              prompt,
+              force_offload: 'bad quality video',
+              text_encoders: ['16', 0],
+            },
+            class_type: 'HyVideoTextEncode',
+          },
+          '34': {
+            inputs: {
+              frame_rate: 16,
+              loop_count: 0,
+              filename_prefix: '1176',
+              format: 'video/h264-mp4',
+              pix_fmt: 'yuv420p',
+              crf: 19,
+              save_metadata: true,
+              pingpong: false,
+              save_output: false,
+              images: ['5', 0],
+            },
+            class_type: 'VHS_VideoCombine',
+          },
+        },
+      },
+    });
+
+    await job.updateData({ ...job.data, runpod_id });
+    return handleStatus(runpod_id, job);
+  }
+}
+
+// run the above function when 'image' job is created (prompt.ts)
+createWorker('hunyuanvideo', videoJobHunyuan);
+
+const videoQueue = new Queue('hunyuanvideo', {
   connection: redisClient,
 });
 const imageQueue = new Queue('image', {
