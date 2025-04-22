@@ -56,7 +56,7 @@ async function handleStatus(runpod_id, job: Job) {
       const json = `Got status ${JSON.stringify(status)}`;
       if (lastStatus !== json) {
         lastStatus = json;
-        if (DEBUG) console.log(`Got status: ${json}`);
+        if (DEBUG) console.log(`${json}`);
         await job.log(`${new Date().toISOString()}: ${json}`);
       }
       if (status.status === 'FAILED') {
@@ -169,8 +169,8 @@ async function videoJob(job: Job) {
     const size = { width: job.data.width || 960, height: job.data.height || 544 };
 
     const pre_text: string = job.data.pre_text || 'highly detailed, 4k, masterpiece';
-    const print_output: string =
-      job.data.print_output || '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot';
+    const app_text: string =
+      job.data.app_text || '(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot';
     const frame_count: number = job.data.frame_count || 64;
     const frame_rate: number = job.data.frame_rate || 8;
     const motion_scale: number = job.data.motion_scale || 1;
@@ -282,9 +282,9 @@ async function videoJob(job: Job) {
             inputs: {
               text: prompt,
               max_frames: frame_count,
-              print_output,
+              print_output: '0',
               pre_text,
-              app_text: '0',
+              app_text,
               end_frame: frame_count,
               start_frame: 0,
               pw_a: 0,
@@ -386,6 +386,13 @@ async function videoJobHunyuan(job: Job) {
     const prompt =
       json.substring(1, json.length - 1) ||
       "foreground: a three dimensional sensual liquid spins, pulses, and morphs like a nudibranch. it's made of sparks and prismatic beams of light and covered kind of advanced biomimicry technology. \n\nbackground: dark sky with nebula and stars\n\nstyle is realistic and detailed with bokeh, but with exagerated colors and lines.";
+    const seed: number = job.data.seed || 6;
+    const steps: number = job.data.steps || 30;
+    const filename_prefix: string = job.id + '';
+    const size = { width: job.data.width || 640, height: job.data.height || 368 };
+
+    const frame_count: number = job.data.frame_count || 85;
+    const frame_rate: number = job.data.frame_rate || 16;
 
     const { id: runpod_id } = await endpoint.run({
       input: {
@@ -402,13 +409,13 @@ async function videoJobHunyuan(job: Job) {
           },
           '3': {
             inputs: {
-              width: 640,
-              height: 368,
-              num_frames: 85,
-              steps: 30,
+              width: size.width,
+              height: size.height,
+              num_frames: frame_count,
+              steps,
               embedded_guidance_scale: 6,
               flow_shift: 9,
-              seed: 6,
+              seed,
               force_offload: 1,
               denoise_strength: 1,
               scheduler: 'FlowMatchDiscreteScheduler',
@@ -455,9 +462,9 @@ async function videoJobHunyuan(job: Job) {
           },
           '34': {
             inputs: {
-              frame_rate: 16,
+              frame_rate,
               loop_count: 0,
-              filename_prefix: '1176',
+              filename_prefix,
               format: 'video/h264-mp4',
               pix_fmt: 'yuv420p',
               crf: 19,
