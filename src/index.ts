@@ -383,7 +383,9 @@ async function videoJobHunyuan(job: Job) {
     if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
     // serialize prompt json into format expected
     const json = JSON.stringify(job.data.prompt);
-    const prompt = json.substring(1, json.length - 1);
+    const prompt =
+      json.substring(1, json.length - 1) ||
+      "foreground: a three dimensional sensual liquid spins, pulses, and morphs like a nudibranch. it's made of sparks and prismatic beams of light and covered kind of advanced biomimicry technology. \n\nbackground: dark sky with nebula and stars\n\nstyle is realistic and detailed with bokeh, but with exagerated colors and lines.";
 
     const { id: runpod_id } = await endpoint.run({
       input: {
@@ -409,6 +411,7 @@ async function videoJobHunyuan(job: Job) {
               seed: 6,
               force_offload: 1,
               denoise_strength: 1,
+              scheduler: 'FlowMatchDiscreteScheduler',
               model: ['1', 0],
               hyvid_embeds: ['30', 0],
             },
@@ -418,6 +421,8 @@ async function videoJobHunyuan(job: Job) {
             inputs: {
               enable_vae_tiling: true,
               temporal_tiling_sample_size: 8,
+              spatial_tile_sample_min_size: 256,
+              auto_tile_size: true,
               vae: ['7', 0],
               samples: ['3', 0],
             },
@@ -458,7 +463,7 @@ async function videoJobHunyuan(job: Job) {
               crf: 19,
               save_metadata: true,
               pingpong: false,
-              save_output: false,
+              save_output: true,
               images: ['5', 0],
             },
             class_type: 'VHS_VideoCombine',
