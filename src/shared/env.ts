@@ -16,7 +16,8 @@ export const env = cleanEnv(process.env, {
   REDIS_PASSWORD: str({ default: '' }),
 
   RUNPOD_API_KEY: str(),
-  RUNPOD_ENDPOINT_ID: str(),
+  RUNPOD_HUNYUAN_ENDPOINT_ID: str(),
+  RUNPOD_ANIMATEDIFF_ENDPOINT_ID: str(),
 
   ADMIN_PASS: str(),
 });

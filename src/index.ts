@@ -12,7 +12,8 @@ import redisClient from './shared/redis.js';
 const DEBUG = env.DEBUG;
 
 const runpod = runpodSdk(env.RUNPOD_API_KEY);
-const endpoint = runpod.endpoint(env.RUNPOD_ENDPOINT_ID);
+const animatediff = runpod.endpoint(env.RUNPOD_ANIMATEDIFF_ENDPOINT_ID);
+const hunyuan = runpod.endpoint(env.RUNPOD_HUNYUAN_ENDPOINT_ID);
 
 const serializeError = (error: Error) => {
   return JSON.stringify(error, Object.getOwnPropertyNames(error));
@@ -46,7 +47,7 @@ function createWorker(name: string, handler) {
   });
 }
 
-async function handleStatus(runpod_id, job: Job) {
+async function handleStatus(endpoint, runpod_id, job: Job) {
   let status;
   let lastStatus = '';
   do {
@@ -77,7 +78,7 @@ async function handleStatus(runpod_id, job: Job) {
 }
 
 async function imageJob(job: Job) {
-  if (endpoint) {
+  if (animatediff) {
     if (DEBUG) console.log(`Starting runpod image worker: ${JSON.stringify(job.data)}`);
     const prompt = job.data.prompt || 'A walk in the park';
     const seed: number = job.data.seed || 1337;
@@ -85,7 +86,7 @@ async function imageJob(job: Job) {
     const filename_prefix: string = job.id + '';
     const size = { width: job.data.width || 512, height: job.data.height || 512 };
 
-    const { id: runpod_id } = await endpoint.run({
+    const { id: runpod_id } = await animatediff.run({
       input: {
         workflow: {
           '3': {
@@ -150,7 +151,7 @@ async function imageJob(job: Job) {
     });
 
     await job.updateData({ ...job.data, runpod_id });
-    return handleStatus(runpod_id, job);
+    return handleStatus(animatediff, runpod_id, job);
   }
 }
 
@@ -158,7 +159,7 @@ async function imageJob(job: Job) {
 createWorker('image', imageJob);
 
 async function videoJob(job: Job) {
-  if (endpoint) {
+  if (animatediff) {
     if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
     // serialize prompt json into format expected
     const json = JSON.stringify(job.data.prompt);
@@ -175,7 +176,7 @@ async function videoJob(job: Job) {
     const frame_rate: number = job.data.frame_rate || 8;
     const motion_scale: number = job.data.motion_scale || 1;
 
-    const { id: runpod_id } = await endpoint.run({
+    const { id: runpod_id } = await animatediff.run({
       input: {
         workflow: {
           '1': {
@@ -371,7 +372,7 @@ async function videoJob(job: Job) {
     });
 
     await job.updateData({ ...job.data, runpod_id });
-    return handleStatus(runpod_id, job);
+    return handleStatus(animatediff, runpod_id, job);
   }
 }
 
@@ -379,7 +380,7 @@ async function videoJob(job: Job) {
 createWorker('video', videoJob);
 
 async function videoJobHunyuan(job: Job) {
-  if (endpoint) {
+  if (hunyuan) {
     if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
     // serialize prompt json into format expected
     const json = JSON.stringify(job.data.prompt);
@@ -394,7 +395,7 @@ async function videoJobHunyuan(job: Job) {
     const frame_count: number = job.data.frame_count || 85;
     const frame_rate: number = job.data.frame_rate || 16;
 
-    const { id: runpod_id } = await endpoint.run({
+    const { id: runpod_id } = await hunyuan.run({
       input: {
         workflow: {
           '1': {
@@ -480,7 +481,7 @@ async function videoJobHunyuan(job: Job) {
     });
 
     await job.updateData({ ...job.data, runpod_id });
-    return handleStatus(runpod_id, job);
+    return handleStatus(hunyuan, runpod_id, job);
   }
 }
 
