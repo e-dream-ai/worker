@@ -110,7 +110,7 @@ function myParseInt(value) {
 program
   .command('hunyuan')
   .description('queue a runpod job')
-  .argument('<string>', 'prompt for hunyuan')
+  .argument('<string...>', 'prompt for hunyuan')
   .option('-w, --width <number>', 'width', myParseInt, 1024)
   .option('-h, --height <number>', 'height', myParseInt, 768)
   .option(
@@ -128,13 +128,13 @@ program
     30
   )
   .action((str, options) => {
-    runHunyuan(str.split(), options);
+    runHunyuan(str.join(' ').split(), options);
   });
 
 program
   .command('animatediff')
   .description('queue a runpod job')
-  .argument('<string>', 'prompt for animatediff')
+  .argument('<string...>', 'prompt for animatediff')
   .option(
     '-p, --pre_text <string>',
     'Text that is prepended at the beginning of each prompt in the schedule, allowing for a consistent base across all scheduled prompts',
@@ -162,7 +162,7 @@ program
     30
   )
   .action((str, options) => {
-    runVideo(str.split(), options);
+    runVideo(str.join(' ').split(), options);
   });
 
 program.parse();
