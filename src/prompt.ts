@@ -111,13 +111,13 @@ program
   .command('hunyuan')
   .description('queue a runpod job')
   .argument('<string...>', 'prompt for hunyuan')
-  .option('-w, --width <number>', 'width', myParseInt, 1024)
-  .option('-h, --height <number>', 'height', myParseInt, 768)
+  .option('-w, --width <number>', 'width', myParseInt, 1280)
+  .option('-h, --height <number>', 'height', myParseInt, 720)
   .option(
     '-c, --frame_count <number>',
     'number of frames to compute, must be a multiple of four (after subtracting one',
     myParseInt,
-    609
+    129
   )
   .option('-f, --frame_rate <number>', 'frame rate for video', myParseInt, 16)
   .option('-s, --seed <number>', 'seed', myParseInt, 6)
