@@ -456,7 +456,7 @@ async function videoJobHunyuan(job: Job) {
           '30': {
             inputs: {
               prompt,
-              force_offload: 'bad quality video',
+              force_offload: true,
               text_encoders: ['16', 0],
             },
             class_type: 'HyVideoTextEncode',
