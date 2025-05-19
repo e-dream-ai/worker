@@ -1,6 +1,12 @@
 import { Job, Queue, QueueEvents } from 'bullmq';
 import redisClient from './shared/redis.js';
 import { InvalidArgumentError, program } from 'commander';
+import fs from 'fs';
+
+function imageFileToBase64(path: string) {
+  const img = fs.readFileSync(path);
+  return Buffer.from(img).toString('base64');
+}
 
 const videoQueue = new Queue('video', {
   connection: redisClient,
@@ -55,11 +61,21 @@ const hunyuanQueue = new Queue('hunyuanvideo', {
 });
 
 async function runHunyuan(frames: string[], options) {
+  let images;
+  if (options.image) {
+    images = [
+      {
+        name: options.image,
+        file: imageFileToBase64(options.image),
+      },
+    ];
+  }
   // console.log(`frames: ${JSON.stringify(frames)}`)
   const job = {
     name: 'message',
     data: {
       prompt: frames.join(),
+      images: images,
       frame_count: options.frame_count, // should be a multiple of the context window of 16
       frame_rate: options.frame_rate,
       seed: options.seed,
@@ -127,6 +143,7 @@ program
     myParseInt,
     30
   )
+  .option('-i, --image <string>', 'path to an image file')
   .action((str, options) => {
     runHunyuan(str.join(' ').split(), options);
   });
