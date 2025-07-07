@@ -69,12 +69,12 @@ async function handleStatus(endpoint, runpod_id, job: Job) {
     }
   } while (status?.completed === false);
 
-  const s3url = JSON.parse(JSON.stringify(status))?.output?.message;
-  if (!s3url) {
-    throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
-  } else {
+  const s3url = JSON.parse(JSON.stringify(status))?.output;
+  if (s3url?.message || s3url?.video) {
     // return S3 url to result
     return s3url;
+  } else {
+    throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
   }
 }
 
@@ -487,6 +487,7 @@ async function videoJobHunyuan(job: Job) {
 }
 // run the above function when 'image' job is created (prompt.ts)
 createWorker('hunyuanvideo', videoJobHunyuan);
+
 async function videoJobDeforum(job) {
   if (deforum) {
     if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
