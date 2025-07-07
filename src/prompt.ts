@@ -174,7 +174,7 @@ program
   )
   .option('-f, --frame_rate <number>', 'frame rate for video', myParseInt, 16)
   .action((str, options) => {
-    runDeforum(str, options);
+    runDeforum(JSON.parse(str.join(' ')), options);
   });
 
 program
