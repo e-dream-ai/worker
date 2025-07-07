@@ -89,6 +89,43 @@ async function runHunyuan(frames: string[], options) {
   return hunyuanQueue.addBulk([job]);
 }
 
+const deforumQueue = new Queue('deforumvideo', {
+  connection: redisClient,
+  defaultJobOptions: {
+    attempts: 1,
+    backoff: {
+      type: 'exponential',
+      delay: 1000,
+    },
+  },
+});
+async function runDeforum(prompt, options) {
+  let images;
+  if (options.image) {
+    images = [
+      {
+        name: options.image,
+        file: imageFileToBase64(options.image),
+      },
+    ];
+  }
+  // console.log(`frames: ${JSON.stringify(frames)}`)
+  const job = {
+    name: 'message',
+    data: {
+      prompt,
+      images: images,
+      frame_count: options.frame_count, // should be a multiple of the context window of 16
+      frame_rate: options.frame_rate,
+      steps: options.steps,
+      width: options.width,
+      height: options.height,
+    },
+  };
+  console.log(`running: ${JSON.stringify(job)}`);
+  return deforumQueue.addBulk([job]);
+}
+
 // listen for job events and results. Note that it's best to deal with results directly in the worker
 const queueEvents = new QueueEvents('video');
 queueEvents.on('completed', async (data) => {
@@ -122,6 +159,23 @@ function myParseInt(value) {
   }
   return parsedValue;
 }
+
+program
+  .command('deforum')
+  .description('queue a runpod job')
+  .argument('<string...>', 'prompt for deforum as JSON')
+  .option('-w, --width <number>', 'width', myParseInt, 1024)
+  .option('-h, --height <number>', 'height', myParseInt, 768)
+  .option(
+    '-c, --frame_count <number>',
+    'number of frames to compute, must be a multiple of four (after subtracting one',
+    myParseInt,
+    609
+  )
+  .option('-f, --frame_rate <number>', 'frame rate for video', myParseInt, 16)
+  .action((str, options) => {
+    runDeforum(str, options);
+  });
 
 program
   .command('hunyuan')

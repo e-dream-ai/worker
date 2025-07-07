@@ -18,6 +18,7 @@ export const env = cleanEnv(process.env, {
   RUNPOD_API_KEY: str(),
   RUNPOD_HUNYUAN_ENDPOINT_ID: str(),
   RUNPOD_ANIMATEDIFF_ENDPOINT_ID: str(),
+  RUNPOD_DEFORUM_ENDPOINT_ID: str(),
 
   ADMIN_PASS: str(),
 });

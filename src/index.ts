@@ -14,6 +14,7 @@ const DEBUG = env.DEBUG;
 const runpod = runpodSdk(env.RUNPOD_API_KEY);
 const animatediff = runpod.endpoint(env.RUNPOD_ANIMATEDIFF_ENDPOINT_ID);
 const hunyuan = runpod.endpoint(env.RUNPOD_HUNYUAN_ENDPOINT_ID);
+const deforum = runpod.endpoint(env.RUNPOD_DEFORUM_ENDPOINT_ID);
 
 const serializeError = (error: Error) => {
   return JSON.stringify(error, Object.getOwnPropertyNames(error));
@@ -484,10 +485,43 @@ async function videoJobHunyuan(job: Job) {
     return handleStatus(hunyuan, runpod_id, job);
   }
 }
-
 // run the above function when 'image' job is created (prompt.ts)
 createWorker('hunyuanvideo', videoJobHunyuan);
+async function videoJobDeforum(job) {
+  if (deforum) {
+    if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
+    // serialize prompt json into format expected
+    const size = { width: job.data.width || 640, height: job.data.height || 368 };
+    const frame_count = job.data.frame_count || 85;
+    const frame_rate = job.data.frame_rate || 16;
+    const { id: runpod_id } = await deforum.run({
+      input: {
+        settings: {
+          // spread through all of the fields you might pass in:
+          batch_name: job.id + '',
+          width: size.width,
+          height: size.height,
+          sampler_name: job.data.sampler_name,
+          scheduler: job.data.scheduler,
+          // …all the other knobs…
+          prompts: job.data.prompt,
+          animation_mode: job.data.animation_mode,
+          max_frames: frame_count,
+          fps: frame_rate,
+          // etc.
+        },
+      },
+    });
+    await job.updateData({ ...job.data, runpod_id });
+    return handleStatus(deforum, runpod_id, job);
+  }
+}
+// run the above function when 'image' job is created (prompt.ts)
+createWorker('deforumvideo', videoJobDeforum);
 
+const deforumQueue = new Queue('deforumvideo', {
+  connection: redisClient,
+});
 const videoQueue = new Queue('hunyuanvideo', {
   connection: redisClient,
 });
@@ -502,7 +536,7 @@ const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
 createBullBoard({
-  queues: [new BullMQAdapter(videoQueue), new BullMQAdapter(imageQueue)],
+  queues: [new BullMQAdapter(videoQueue), new BullMQAdapter(imageQueue), new BullMQAdapter(deforumQueue)],
   serverAdapter: serverAdapter,
 });
 
