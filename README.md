@@ -14,7 +14,25 @@
 1. `nvm use`
 2. `npm start &` to start the worker and server
 3. visit http://localhost:3000/admin/queues to view job queues
-4. `node dist/prompt.js A fish on a bicycle` to execute a job with a prompt OR `node dist/prompt.js keyframe1, keyframe2, keyframe3` to replace multiple keyframes with comma-separated values, see
+
+## Developer CLI
+
+### Option 1: Shell Script
+
+```bash
+./gpu video "A fish on a bicycle"
+./gpu animate "sunrise over mountains" "midday clouds" "sunset colors"
+./gpu deforum '{"prompts": {"0": "cyberpunk city", "100": "neon lights"}}'
+./gpu help
+```
+
+### Option 2: NPM Scripts
+
+```bash
+npm run video -- "A magical forest"
+npm run animate -- "frame1" "frame2" "frame3"
+npm run deforum -- '{"prompts": {...}}'
+```
 
 ## Ops
 

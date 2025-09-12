@@ -10,7 +10,11 @@
     "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"nodemon dist/index.js\"",
     "lint": "eslint . -c src/*.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "video": "npm run build && node dist/prompt.js hunyuan",
+    "animate": "npm run build && node dist/prompt.js animatediff",
+    "deforum": "npm run build && node dist/prompt.js deforum",
+    "generate": "npm run build && node dist/prompt.js"
   },
   "author": "Max Carlson",
   "license": "Apache 2",

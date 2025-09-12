@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Usage: ./gpu video "your prompt"
+#        ./gpu animate "prompt1" "prompt2" "prompt3"
+#        ./gpu deforum '{"prompts": {...}}'
+
+cd "$(dirname "$0")"
+
+npm run build > /dev/null 2>&1
+
+case "$1" in
+  "video"|"v")
+    shift
+    node dist/prompt.js hunyuan "$@"
+    ;;
+  "animate"|"a")
+    shift
+    node dist/prompt.js animatediff "$@"
+    ;;
+  "deforum"|"d")
+    shift
+    node dist/prompt.js deforum "$@"
+    ;;
+  "help"|"-h"|"--help"|"")
+    echo "GPU Job CLI"
+    echo ""
+    echo "Usage:"
+    echo "  ./gpu video 'A fish on a bicycle'              # Generate video with Hunyuan"
+    echo "  ./gpu animate 'frame1' 'frame2' 'frame3'       # Generate animation with AnimateDiff"
+    echo "  ./gpu deforum '{\"prompts\": {...}}'            # Generate with Deforum"
+    echo ""
+    echo "Shortcuts:"
+    echo "  ./gpu v 'prompt'     # Same as 'video'"
+    echo "  ./gpu a 'prompts'    # Same as 'animate'"
+    echo "  ./gpu d 'settings'   # Same as 'deforum'"
+    echo ""
+    echo "Examples:"
+    echo "  ./gpu video 'A magical forest with unicorns'"
+    echo "  ./gpu animate 'sunrise' 'midday' 'sunset'"
+    echo ""
+    ;;
+  *)
+    echo "Unknown command: $1"
+    echo "Use './gpu help' for usage information"
+    exit 1
+    ;;
+esac
