@@ -16,6 +16,10 @@
 3. visit http://localhost:3000/admin/queues to view job queues
 4. `node dist/prompt.js A fish on a bicycle` to execute a job with a prompt OR `node dist/prompt.js keyframe1, keyframe2, keyframe3` to replace multiple keyframes with comma-separated values, see
 
+```
+node dist/prompt.js deforum \{\"0\": \"a fish on a bicycle\"\}
+```
+
 ## Ops
 
 1. Visit https://www.runpod.io/console/serverless/user/endpoint/89vs9h0qx0g966?tab=requests to see recent activity and cancel jobs you don't wish to keep running.
