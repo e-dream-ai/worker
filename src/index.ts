@@ -6,6 +6,11 @@ import 'dotenv/config';
 import express from 'express';
 import basicAuth from 'express-basic-auth';
 import runpodSdk from 'runpod-sdk';
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
 import env from './shared/env.js';
 import redisClient from './shared/redis.js';
 
@@ -19,6 +24,77 @@ const deforum = runpod.endpoint(env.RUNPOD_DEFORUM_ENDPOINT_ID);
 const serializeError = (error: Error) => {
   return JSON.stringify(error, Object.getOwnPropertyNames(error));
 };
+
+function downloadFileAttempt(url: string, destinationPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const client = parsedUrl.protocol === 'https:' ? https : http;
+
+    const request = client.get(url, (response) => {
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        return downloadFileAttempt(response.headers.location, destinationPath).then(resolve).catch(reject);
+      }
+
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+        return;
+      }
+
+      const fileStream = fs.createWriteStream(destinationPath);
+
+      response.pipe(fileStream);
+
+      fileStream.on('finish', () => {
+        fileStream.close();
+        resolve();
+      });
+
+      fileStream.on('error', (error) => {
+        fs.unlink(destinationPath, () => {});
+        reject(error);
+      });
+
+      response.on('error', (error) => {
+        fs.unlink(destinationPath, () => {});
+        reject(error);
+      });
+    });
+
+    request.on('error', reject);
+    request.setTimeout(300000, () => {
+      request.destroy();
+      reject(new Error('Download timeout'));
+    });
+  });
+}
+
+async function downloadFile(url: string, destinationPath: string, maxRetries: number = 3): Promise<void> {
+  const downloadDir = path.dirname(destinationPath);
+
+  // Ensure download directory exists
+  if (!fs.existsSync(downloadDir)) {
+    fs.mkdirSync(downloadDir, { recursive: true });
+  }
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await downloadFileAttempt(url, destinationPath);
+      if (DEBUG) console.log(`✓ Successfully downloaded: ${url} -> ${destinationPath}`);
+      return;
+    } catch (error) {
+      console.error(`Download attempt ${attempt}/${maxRetries} failed for ${url}:`, error.message);
+
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to download ${url} after ${maxRetries} attempts: ${error.message}`);
+      }
+
+      // Exponential backoff: wait 2^attempt seconds
+      const waitTime = Math.pow(2, attempt) * 1000;
+      console.log(`Retrying in ${waitTime}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+  }
+}
 
 function createWorker(name: string, handler) {
   const worker = new Worker(
@@ -69,12 +145,32 @@ async function handleStatus(endpoint, runpod_id, job: Job) {
     }
   } while (status?.completed === false);
 
-  const s3url = JSON.parse(JSON.stringify(status))?.output;
-  if (s3url?.message || s3url?.video) {
-    // return S3 url to result
-    return s3url;
+  const result = JSON.parse(JSON.stringify(status))?.output;
+  if (result?.message || result?.video) {
+    if (result.video && !result.requires_auth) {
+      try {
+        const downloadDir = './downloads';
+        const filename = `${job.id}_${Date.now()}.mp4`;
+        const localPath = path.join(downloadDir, filename);
+
+        await job.log(`${new Date().toISOString()}: Starting download of video file...`);
+        await downloadFile(result.video, localPath);
+
+        result.local_path = localPath;
+        result.downloaded_at = new Date().toISOString();
+
+        await job.log(`${new Date().toISOString()}: Video downloaded successfully to ${localPath}`);
+        if (DEBUG) console.log(`✓ Video downloaded for job ${job.id}: ${localPath}`);
+      } catch (downloadError) {
+        console.error(`Failed to download video for job ${job.id}:`, downloadError.message);
+        await job.log(`${new Date().toISOString()}: Download failed: ${downloadError.message}`);
+        result.download_error = downloadError.message;
+      }
+    }
+
+    return result;
   } else {
-    throw new Error(`no S3 url for result, status ${JSON.stringify(status)}`);
+    throw new Error(`no video URL in result, status ${JSON.stringify(status)}`);
   }
 }
 
