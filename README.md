@@ -14,10 +14,23 @@
 1. `nvm use`
 2. `npm start &` to start the worker and server
 3. visit http://localhost:3000/admin/queues to view job queues
-4. `node dist/prompt.js A fish on a bicycle` to execute a job with a prompt OR `node dist/prompt.js keyframe1, keyframe2, keyframe3` to replace multiple keyframes with comma-separated values, see
+4. `node dist/prompt.js animatediff "frame1, frame2, frame3"` or `node dist/prompt.js deforum '{"0":"fish"}'`. You can also pass JSON via file using the @file syntax:
+   - `node dist/prompt.js deforum @prompt/deforum-fish.json`
+   - `node dist/prompt.js animatediff @prompt/animatediff-dog.json`
 
 ```
 node dist/prompt.js deforum \{\"0\": \"a fish on a bicycle\"\}
+```
+
+### Bash CLI
+
+- `./gpu animatediff @prompt/animatediff-dog.json`
+- `./gpu deforum @prompt/deforum-fish.json`
+
+If you see `permission denied` when running `./gpu`, make the script executable:
+
+```
+chmod +x ./gpu
 ```
 
 ## Ops

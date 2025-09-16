@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Usage: ./gpu animatediff "prompt1" "prompt2" "prompt3"
+#        ./gpu deforum '{"prompts": {...}}'
+#        ./gpu deforum @prompt/deforum-fish.json
+
+cd "$(dirname "$0")"
+
+npm run build > /dev/null 2>&1
+
+case "$1" in
+  "animatediff"|"a")
+    shift
+    if [[ "$1" == @* ]]; then
+      file="${1#@}"
+      if [[ -f "$file" ]]; then
+        payload="$(cat "$file")"
+        shift
+        node dist/prompt.js animatediff "$payload" "$@"
+        exit $?
+      else
+        echo "File not found: $file"
+        exit 2
+      fi
+    fi
+    node dist/prompt.js animatediff "$@"
+    ;;
+  "deforum"|"d")
+    shift
+    if [[ "$1" == @* ]]; then
+      file="${1#@}"
+      if [[ -f "$file" ]]; then
+        payload="$(cat "$file")"
+        shift
+        node dist/prompt.js deforum "$payload" "$@"
+        exit $?
+      else
+        echo "File not found: $file"
+        exit 2
+      fi
+    fi
+    node dist/prompt.js deforum "$@"
+    ;;
+  "help"|"-h"|"--help"|"")
+    echo "GPU Job CLI"
+    echo ""
+    echo "Usage:"
+    echo "  ./gpu animatediff 'frame1' 'frame2' 'frame3'   # Generate animation with AnimateDiff"
+    echo "  ./gpu animatediff @prompt/animatediff-dog.json # Read Animatediff JSON from file"
+    echo "  ./gpu deforum '{\"prompts\": {...}}'          # Generate with Deforum"
+    echo "  ./gpu deforum @prompt/deforum-fish.json      # Read Deforum JSON from file"
+    echo ""
+    echo "Shortcuts:"
+    echo "  ./gpu a 'prompts'    # Alias for 'animatediff'"
+    echo "  ./gpu d 'settings'   # Alias for 'deforum'"
+    echo ""
+    echo "Examples:"
+    echo "  ./gpu animatediff 'sunrise' 'midday' 'sunset'"
+    echo "  ./gpu deforum @prompt/deforum-fish.json"
+    echo ""
+    ;;
+  *)
+    echo "Unknown command: $1"
+    echo "Use './gpu help' for usage information"
+    exit 1
+    ;;
+esac

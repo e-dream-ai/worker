@@ -138,9 +138,7 @@ async function handleStatus(endpoint, runpod_id, job: Job) {
         await job.log(`${new Date().toISOString()}: ${json}`);
       }
       if (status.status === 'FAILED') {
-        const failedError = status?.error || status?.output?.error || status?.output?.message || 'Unknown error';
-        const err = new Error(`Runpod job FAILED: ${failedError}. status=${JSON.stringify(status)}`);
-        throw err;
+        throw new Error(JSON.stringify(status));
       }
     } catch (e) {
       console.error('error getting endpoint status', e.message);
@@ -172,10 +170,7 @@ async function handleStatus(endpoint, runpod_id, job: Job) {
 
     return result;
   } else {
-    const missingKeys = Object.keys(result || {});
-    throw new Error(
-      `No video URL in result. Present keys: [${missingKeys.join(', ')}] status=${JSON.stringify(status)}`
-    );
+    throw new Error(`no video URL in result, status ${JSON.stringify(status)}`);
   }
 }
 
