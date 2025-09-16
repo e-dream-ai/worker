@@ -619,21 +619,29 @@ createWorker('deforumvideo', videoJobDeforum);
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
 });
-const videoQueue = new Queue('hunyuanvideo', {
+const hunyuanVideoQueue = new Queue('hunyuanvideo', {
+  connection: redisClient,
+});
+const animatediffVideoQueue = new Queue('video', {
   connection: redisClient,
 });
 const imageQueue = new Queue('image', {
   connection: redisClient,
 });
 
-const jobs = await videoQueue.getJobs(['active']);
+const jobs = await hunyuanVideoQueue.getJobs(['active']);
 console.log(`Active jobs, ${JSON.stringify(jobs)}`);
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
 createBullBoard({
-  queues: [new BullMQAdapter(videoQueue), new BullMQAdapter(imageQueue), new BullMQAdapter(deforumQueue)],
+  queues: [
+    new BullMQAdapter(hunyuanVideoQueue),
+    new BullMQAdapter(animatediffVideoQueue),
+    new BullMQAdapter(imageQueue),
+    new BullMQAdapter(deforumQueue),
+  ],
   serverAdapter: serverAdapter,
 });
 
