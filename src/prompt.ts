@@ -170,7 +170,7 @@ program
     '-c, --frame_count <number>',
     'number of frames to compute, must be a multiple of four (after subtracting one',
     myParseInt,
-    609
+    129
   )
   .option('-f, --frame_rate <number>', 'frame rate for video', myParseInt, 16)
   .action((str, options) => {
@@ -222,7 +222,7 @@ program
     '-c, --frame_count <number>',
     'number of frames to compute, must be a multiple of four (after subtracting one',
     myParseInt,
-    609
+    129
   )
   .option('-f, --frame_rate <number>', 'frame rate for video', myParseInt, 16)
   .option('-s, --seed <number>', 'seed', myParseInt, 6)
