@@ -150,7 +150,13 @@ async function handleStatus(endpoint, runpod_id, job: Job) {
     if (result.video && !result.requires_auth) {
       try {
         const downloadDir = './downloads';
-        const filename = `${job.id}_${Date.now()}.mp4`;
+        const requestedNameRaw: unknown = (job?.data as any)?.output_name;
+        const sanitizedRequestedName: string | null =
+          typeof requestedNameRaw === 'string' && requestedNameRaw.trim().length > 0
+            ? path.basename(requestedNameRaw).replace(/[^a-zA-Z0-9._-]/g, '')
+            : null;
+        const baseName: string = sanitizedRequestedName ?? `${job.id}_${Date.now()}.mp4`;
+        const filename = baseName.endsWith('.mp4') ? baseName : `${baseName}.mp4`;
         const localPath = path.join(downloadDir, filename);
 
         await job.log(`${new Date().toISOString()}: Starting download of video file...`);

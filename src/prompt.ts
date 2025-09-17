@@ -2,6 +2,7 @@ import { Job, Queue, QueueEvents } from 'bullmq';
 import redisClient from './shared/redis.js';
 import { InvalidArgumentError, program } from 'commander';
 import fs from 'fs';
+import path from 'path';
 
 function imageFileToBase64(path: string) {
   const img = fs.readFileSync(path);
@@ -19,19 +20,29 @@ const videoQueue = new Queue('video', {
   },
 });
 
-async function runVideo(frames: string[], options) {
-  // console.log(`frames: ${JSON.stringify(frames)}`)
-  const scheduleKeys = ['0', '100', '200', '300', '400', '500', '608'] as const;
+async function runVideo(framesOrSchedule: string[] | Record<string, string>, options) {
   const promptSchedule: Record<string, string> = {};
-  for (let i = 0; i < 6; i++) {
-    const value = frames[i]?.trim();
-    if (value) {
-      promptSchedule[scheduleKeys[i]] = value;
+
+  if (Array.isArray(framesOrSchedule)) {
+    const frames = framesOrSchedule;
+    const scheduleKeys = ['0', '100', '200', '300', '400', '500', '608'] as const;
+    for (let i = 0; i < 6; i++) {
+      const value = frames[i]?.trim();
+      if (value) {
+        promptSchedule[scheduleKeys[i]] = value;
+      }
     }
-  }
-  const lastValue = frames[6]?.trim() || frames[0]?.trim();
-  if (lastValue) {
-    promptSchedule['608'] = lastValue;
+    const lastValue = frames[6]?.trim() || frames[0]?.trim();
+    if (lastValue) {
+      promptSchedule['608'] = lastValue;
+    }
+  } else {
+    for (const [key, value] of Object.entries(framesOrSchedule)) {
+      const v = String(value).trim();
+      if (v) {
+        promptSchedule[key] = v;
+      }
+    }
   }
 
   const job = {
@@ -47,6 +58,7 @@ async function runVideo(frames: string[], options) {
       width: options.width,
       height: options.height,
       motion_scale: 1,
+      output_name: options.output_name,
     },
   };
 
@@ -125,6 +137,7 @@ async function runDeforum(prompt, options) {
       steps: options.steps,
       width: options.width,
       height: options.height,
+      output_name: options.output_name,
     },
   };
   console.log(`running: ${JSON.stringify(job)}`);
@@ -150,6 +163,13 @@ async function handleJobCompleted(data: { jobId: string }, queueName: keyof type
     console.log(
       `\n${new Date().toISOString()}: Job finished: ${JSON.stringify(job?.returnvalue)} for job ${JSON.stringify(job?.id)}`
     );
+    if (queuedJobIds.has(data.jobId)) {
+      const rv: any = job?.returnvalue;
+      if (rv?.local_path) {
+        console.log(`Downloaded file saved at: ${rv.local_path}`);
+        process.exit(0);
+      }
+    }
   } catch (error) {
     console.error(
       `\n${new Date().toISOString()}: Error retrieving completed job ${data.jobId} from ${queueName}:`,
@@ -204,10 +224,12 @@ function myParseInt(value) {
   return parsedValue;
 }
 
+const queuedJobIds: Set<string> = new Set();
+
 program
   .command('deforum')
   .description('queue a runpod job')
-  .argument('<string...>', 'prompt for deforum as JSON or @file.json')
+  .argument('<string...>', 'prompt for deforum; JSON string, file.json path, or comma list')
   .option('-w, --width <number>', 'width', myParseInt, 1024)
   .option('-h, --height <number>', 'height', myParseInt, 768)
   .option(
@@ -217,17 +239,26 @@ program
     609
   )
   .option('-f, --frame_rate <number>', 'frame rate for video', myParseInt, 16)
-  .action((str, options) => {
+  .action(async (str, options) => {
     let raw = str.join(' ');
     const trimmed = raw.trim();
-    if (trimmed.startsWith('@')) {
-      const file = trimmed.slice(1);
+    let outputNameFromFile: string | undefined;
+    if (trimmed.endsWith('.json') && fs.existsSync(trimmed)) {
+      const file = trimmed;
       if (!fs.existsSync(file)) {
         throw new InvalidArgumentError(`File not found: ${file}`);
       }
       raw = fs.readFileSync(file, 'utf8');
+      const base = path.basename(file, path.extname(file));
+      outputNameFromFile = `${base}.mp4`;
     }
-    runDeforum(JSON.parse(raw), options);
+    const jobs = await runDeforum(JSON.parse(raw), {
+      ...options,
+      output_name: outputNameFromFile ?? options.output_name,
+    });
+    for (const job of jobs) {
+      if (job?.id) queuedJobIds.add(String(job.id));
+    }
   });
 
 program
@@ -251,14 +282,17 @@ program
     30
   )
   .option('-i, --image <string>', 'path to an image file')
-  .action((str, options) => {
-    runHunyuan(str.join(' ').split(), options);
+  .action(async (str, options) => {
+    const jobs = await runHunyuan(str.join(' ').split(), options);
+    for (const job of jobs) {
+      if (job?.id) queuedJobIds.add(String(job.id));
+    }
   });
 
 program
   .command('animatediff')
   .description('queue a runpod job')
-  .argument('<string...>', 'prompt for animatediff; comma list, JSON, or @file.json')
+  .argument('<string...>', 'prompt for animatediff; comma list, JSON string, or file.json path')
   .option(
     '-p, --pre_text <string>',
     'Text that is prepended at the beginning of each prompt in the schedule, allowing for a consistent base across all scheduled prompts',
@@ -285,15 +319,18 @@ program
     myParseInt,
     30
   )
-  .action((str, options) => {
+  .action(async (str, options) => {
     let raw = str.join(' ');
     const trimmed = raw.trim();
-    if (trimmed.startsWith('@')) {
-      const file = trimmed.slice(1);
+    let outputNameFromFile: string | undefined;
+    if (trimmed.endsWith('.json') && fs.existsSync(trimmed)) {
+      const file = trimmed;
       if (!fs.existsSync(file)) {
         throw new InvalidArgumentError(`File not found: ${file}`);
       }
       raw = fs.readFileSync(file, 'utf8');
+      const base = path.basename(file, path.extname(file));
+      outputNameFromFile = `${base}.mp4`;
     }
     const defaultAnimatediffOptions = {
       pre_text: 'highly detailed, 4k, masterpiece',
@@ -319,6 +356,7 @@ program
     ] as const;
 
     let frames: string[] = [];
+    let schedule: Record<string, string> | null = null;
     const jsonOptions: Record<string, unknown> = {};
     try {
       const parsed = JSON.parse(raw);
@@ -333,14 +371,20 @@ program
           frames = (obj.prompts as unknown[]).map((x) => String(x));
         } else if (typeof obj.prompts === 'object' && obj.prompts !== null) {
           const pm = obj.prompts as Record<string, unknown>;
-          const orderedKeys = Object.keys(pm).sort((a, b) => Number(a) - Number(b));
-          frames = orderedKeys.map((k) => String(pm[k]));
+          schedule = {};
+          for (const [k, v] of Object.entries(pm)) {
+            if (/^\d+$/.test(k)) {
+              schedule[k] = String(v);
+            }
+          }
         } else {
           // Fallback: treat numeric keys as schedule on the root
           const numericKeys = Object.keys(obj).filter((k) => /^\d+$/.test(k));
           if (numericKeys.length > 0) {
-            const orderedKeys = numericKeys.sort((a, b) => Number(a) - Number(b));
-            frames = orderedKeys.map((k) => String(obj[k] as unknown));
+            schedule = {};
+            for (const k of numericKeys) {
+              schedule[k] = String(obj[k] as unknown);
+            }
           }
         }
         // Extract options
@@ -353,7 +397,7 @@ program
     } catch {
       // Non-JSON input: comma-separated or space separated prompts
     }
-    if (frames.length === 0) {
+    if (!schedule && frames.length === 0) {
       frames = raw.split(',');
     }
 
@@ -372,7 +416,13 @@ program
       effectiveOptions.image = jsonOptions.image;
     }
 
-    runVideo(frames, effectiveOptions);
+    if (outputNameFromFile && (effectiveOptions as any)) {
+      (effectiveOptions as any).output_name = outputNameFromFile;
+    }
+    const jobs = await runVideo(schedule ?? frames, effectiveOptions);
+    for (const job of jobs) {
+      if (job?.id) queuedJobIds.add(String(job.id));
+    }
   });
 
 program.parse();
