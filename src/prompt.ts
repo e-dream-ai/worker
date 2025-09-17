@@ -132,27 +132,66 @@ async function runDeforum(prompt, options) {
 }
 
 // listen for job events and results. Note that it's best to deal with results directly in the worker
-const queueEvents = new QueueEvents('video');
-queueEvents.on('completed', async (data) => {
-  const job = await Job.fromId(hunyuanQueue, data.jobId);
-  console.log(
-    `\n${new Date().toISOString()}: Job finished: ${JSON.stringify(job?.returnvalue)} for job ${JSON.stringify(job)}`
-  );
-});
-let lastprogress = '';
-queueEvents.on('progress', (data) => {
+const videoQueueEvents = new QueueEvents('video');
+const hunyuanQueueEvents = new QueueEvents('hunyuanvideo');
+const deforumQueueEvents = new QueueEvents('deforumvideo');
+
+// Map queue names to their corresponding Queue instances
+const queueMap = {
+  video: videoQueue,
+  hunyuanvideo: hunyuanQueue,
+  deforumvideo: deforumQueue,
+} as const;
+
+async function handleJobCompleted(data: { jobId: string }, queueName: keyof typeof queueMap): Promise<void> {
+  try {
+    const queue = queueMap[queueName];
+    const job = await Job.fromId(queue, data.jobId);
+    console.log(
+      `\n${new Date().toISOString()}: Job finished: ${JSON.stringify(job?.returnvalue)} for job ${JSON.stringify(job?.id)}`
+    );
+  } catch (error) {
+    console.error(
+      `\n${new Date().toISOString()}: Error retrieving completed job ${data.jobId} from ${queueName}:`,
+      error
+    );
+  }
+}
+
+async function handleJobFailed(data: { jobId: string }, queueName: keyof typeof queueMap): Promise<void> {
+  try {
+    const queue = queueMap[queueName];
+    const job = await Job.fromId(queue, data.jobId);
+    console.log(`\n${new Date().toISOString()}: Job failed: ${job?.failedReason} for job ${JSON.stringify(job?.id)}`);
+  } catch (error) {
+    console.error(`\n${new Date().toISOString()}: Error retrieving failed job ${data.jobId} from ${queueName}:`, error);
+  }
+}
+
+function handleJobProgress(data: any): void {
   const progress = JSON.stringify(data);
-  if (lastprogress != progress) {
+  if (lastprogress !== progress) {
     console.log(`\n${new Date().toISOString()}: Job progress: ${progress}`);
     lastprogress = progress;
   } else {
     process.stdout.write('.');
   }
-});
-queueEvents.on('failed', async (data) => {
-  const job = await Job.fromId(hunyuanQueue, data.jobId);
-  console.log(`\n${new Date().toISOString()}: Job failed:   ${job.failedReason} for job ${JSON.stringify(job)}`);
-});
+}
+
+let lastprogress = '';
+
+// Set up event listeners for all queues
+videoQueueEvents.on('completed', (data) => handleJobCompleted(data, 'video'));
+videoQueueEvents.on('progress', handleJobProgress);
+videoQueueEvents.on('failed', (data) => handleJobFailed(data, 'video'));
+
+hunyuanQueueEvents.on('completed', (data) => handleJobCompleted(data, 'hunyuanvideo'));
+hunyuanQueueEvents.on('progress', handleJobProgress);
+hunyuanQueueEvents.on('failed', (data) => handleJobFailed(data, 'hunyuanvideo'));
+
+deforumQueueEvents.on('completed', (data) => handleJobCompleted(data, 'deforumvideo'));
+deforumQueueEvents.on('progress', handleJobProgress);
+deforumQueueEvents.on('failed', (data) => handleJobFailed(data, 'deforumvideo'));
 
 program.name('prompt').description('CLI to queue runpod jobs');
 
