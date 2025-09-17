@@ -7,10 +7,10 @@
   },
   "pre_text": "highly detailed, 4k, masterpiece",
   "app_text": "(Masterpiece, best quality:1.2)  walking towards camera, full body closeup shot",
-  "frame_count": 64,
+  "frame_count": 32,
   "frame_rate": 16,
-  "width": 1024,
-  "height": 576,
+  "width": 512,
+  "height": 512,
   "steps": 12,
   "seed": 6
 }

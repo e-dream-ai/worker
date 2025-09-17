@@ -1,1 +1,7 @@
-{ "0": "a fish on a bicycle" }
+{
+  "0": "a fish on a bicycle",
+  "width": 1024,
+  "height": 768,
+  "max_frames": 609,
+  "fps": 16
+}

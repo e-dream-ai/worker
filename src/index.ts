@@ -149,15 +149,26 @@ async function handleStatus(endpoint, runpod_id, job: Job) {
   if (result?.message || result?.video) {
     if (result.video && !result.requires_auth) {
       try {
-        const downloadDir = './downloads';
-        const requestedNameRaw: unknown = (job?.data as any)?.output_name;
-        const sanitizedRequestedName: string | null =
-          typeof requestedNameRaw === 'string' && requestedNameRaw.trim().length > 0
-            ? path.basename(requestedNameRaw).replace(/[^a-zA-Z0-9._-]/g, '')
-            : null;
-        const baseName: string = sanitizedRequestedName ?? `${job.id}_${Date.now()}.mp4`;
-        const filename = baseName.endsWith('.mp4') ? baseName : `${baseName}.mp4`;
-        const localPath = path.join(downloadDir, filename);
+        const jobData = job?.data as any;
+        const customOutputPath: string | undefined = jobData?.custom_output_path;
+        const inputFilePath: string | undefined = jobData?.input_file_path;
+        const requestedNameRaw: unknown = jobData?.output_name;
+
+        let localPath: string;
+
+        if (customOutputPath) {
+          localPath = path.isAbsolute(customOutputPath)
+            ? customOutputPath
+            : path.resolve(process.cwd(), customOutputPath);
+        } else if (inputFilePath && requestedNameRaw) {
+          const inputDir = path.dirname(inputFilePath);
+          const sanitizedName = path.basename(String(requestedNameRaw)).replace(/[^a-zA-Z0-9._-]/g, '');
+          const filename = sanitizedName.endsWith('.mp4') ? sanitizedName : `${sanitizedName}.mp4`;
+          localPath = path.join(inputDir, filename);
+        } else {
+          const baseName = `${job.id}_${Date.now()}.mp4`;
+          localPath = path.resolve(process.cwd(), baseName);
+        }
 
         await job.log(`${new Date().toISOString()}: Starting download of video file...`);
         await downloadFile(result.video, localPath);
@@ -263,10 +274,15 @@ createWorker('image', imageJob);
 
 async function videoJob(job: Job) {
   if (animatediff) {
-    if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
-    // serialize prompt json into format expected
-    const json = JSON.stringify(job.data.prompt);
-    const prompt = json.substring(1, json.length - 1);
+    const prompts = job.data.prompts || {};
+    const promptsJson = JSON.stringify(prompts);
+
+    if (!promptsJson) {
+      throw new Error(`prompts data is missing or invalid: ${JSON.stringify(job.data)}`);
+    }
+
+    const prompt = promptsJson.substring(1, promptsJson.length - 1);
+
     const seed: number = job.data.seed || 832386334143550;
     const steps: number = job.data.steps || 30;
     const filename_prefix: string = job.id + '';
@@ -593,25 +609,28 @@ createWorker('hunyuanvideo', videoJobHunyuan);
 async function videoJobDeforum(job) {
   if (deforum) {
     if (DEBUG) console.log(`Starting runpod video worker: ${JSON.stringify(job.data)}`);
-    // serialize prompt json into format expected
-    const size = { width: job.data.width || 640, height: job.data.height || 368 };
-    const frame_count = job.data.frame_count || 85;
-    const frame_rate = job.data.frame_rate || 16;
+    const { ...promptData } = job.data;
+
+    const prompts = {};
+    const otherParams = {};
+
+    for (const [key, value] of Object.entries(promptData)) {
+      if (/^\d+$/.test(key)) {
+        prompts[key] = value;
+      } else {
+        otherParams[key] = value;
+      }
+    }
+
     const { id: runpod_id } = await deforum.run({
       input: {
         settings: {
-          // spread through all of the fields you might pass in:
           batch_name: job.id + '',
-          width: size.width,
-          height: size.height,
-          sampler_name: job.data.sampler_name,
-          scheduler: job.data.scheduler,
-          // …all the other knobs…
-          prompts: job.data.prompt,
-          animation_mode: job.data.animation_mode,
-          max_frames: frame_count,
-          fps: frame_rate,
-          // etc.
+          prompts: prompts,
+          ...otherParams,
+          output_name: undefined,
+          input_file_path: undefined,
+          custom_output_path: undefined,
         },
       },
     });

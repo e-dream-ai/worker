@@ -14,14 +14,11 @@
 1. `nvm use`
 2. `npm start &` to start the worker and server
 3. visit http://localhost:3000/admin/queues to view job queues
-4. `node dist/prompt.js animatediff "frame1, frame2, frame3"` or `node dist/prompt.js deforum '{"0":"fish"}'`. You can also pass JSON via file path
-   - `node dist/prompt.js deforum prompt/deforum-fish.json`
-   - `node dist/prompt.js animatediff prompt/animatediff-dog.json`
-   - When a JSON file path is used, the output will be saved using the JSON file name (e.g. `animatediff-dog.mp4`).
-
-```
-node dist/prompt.js deforum \{\"0\": \"a fish on a bicycle\"\}
-```
+4. Run jobs using JSON files:
+   - `node dist/prompt.js deforum prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
+   - `node dist/prompt.js animatediff prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
+   - By default, output files are saved in the same directory as the input JSON file with a `.mp4` extension
+   - Use the `-o` option to specify a custom output path: `node dist/prompt.js deforum prompt/deforum-fish.json -o my-custom-name.mp4` (creates `my-custom-name.mp4` in current directory)
 
 ## Ops
 
