@@ -5,12 +5,12 @@ export const env = cleanEnv(process.env, {
   NODE_ENV: str({ choices: ['development', 'test', 'production', 'stage'] }),
   PORT: port({ default: 3000 }),
   DEBUG: bool({ default: false }),
+  REMOTE_MODE: bool({ default: false }),
 
   /**
    * REDIS
    */
-  // REDISCLOUD_URL is set by heroku automatically
-  REDISCLOUD_URL: str(),
+  REDISCLOUD_URL: str({ default: '' }),
   REDIS_HOST: str({ default: 'localhost' }),
   REDIS_PORT: port({ default: 6379 }),
   REDIS_PASSWORD: str({ default: '' }),
