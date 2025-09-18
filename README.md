@@ -21,24 +21,31 @@ There are two ways to use this project:
 
 Notes:
 
-- Local vs remote download is decided by the WORKER via `REMOTE_MODE`. With `REMOTE_MODE=false`, the worker downloads the file and returns a `local_path` to the CLI.
+- The worker now always returns a presigned URL, and the CLI downloads to your machine.
+
+Required env vars (local development)
+
+- RUNPOD_API_KEY
+- RUNPOD_ANIMATEDIFF_ENDPOINT_ID
+- RUNPOD_HUNYUAN_ENDPOINT_ID
+- RUNPOD_DEFORUM_ENDPOINT_ID
+- ADMIN_PASS (password for username `admin` in the admin UI)
+- Redis: use local redis info (`REDIS_HOST=localhost`, `REDIS_PORT=6379`, `REDIS_PASSWORD=''`).
 
 ### B) Use deployed worker only (no local server)
 
 1. Build once: `npm run build`
 2. Point the CLI at the same Redis used by the worker. The CLI process needs a few env vars due to validation:
    - Required: `REDISCLOUD_URL`
-   - Required but can be placeholders for the CLI: `RUNPOD_API_KEY`, `RUNPOD_ANIMATEDIFF_ENDPOINT_ID`, `RUNPOD_HUNYUAN_ENDPOINT_ID`, `RUNPOD_DEFORUM_ENDPOINT_ID`
-   - Required: `ADMIN_PASS` (any non-empty string)
 
 ```bash
 node dist/prompt.js animatediff prompt/animatediff-dog.json -o ./out/dog.mp4
 ```
 
-How it works in remote mode
+How it works
 
-- The worker (on Heroku) returns `{ remote_mode: true, r2_url: <public-url> }`.
-- The local CLI downloads from the provided URL to your specified `-o` path (or default path when `-o` is omitted).
+- The worker returns `{ r2_url: <presigned-url> }`.
+- The local CLI downloads from the provided URL to your specified `-o` path (or the default path when `-o` is omitted).
 
 ## Ops
 

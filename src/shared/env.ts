@@ -5,7 +5,6 @@ export const env = cleanEnv(process.env, {
   NODE_ENV: str({ choices: ['development', 'test', 'production', 'stage'] }),
   PORT: port({ default: 3000 }),
   DEBUG: bool({ default: false }),
-  REMOTE_MODE: bool({ default: false }),
 
   /**
    * REDIS

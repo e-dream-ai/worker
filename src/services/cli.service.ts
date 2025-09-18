@@ -135,11 +135,9 @@ export class CLIService {
   }
 
   private async handleJobResult(returnValue: any, job: Job): Promise<void> {
-    if (returnValue?.remote_mode && returnValue?.r2_url) {
+    if (returnValue?.r2_url) {
       await this.handleRemoteDownload(returnValue, job);
-    } else if (returnValue?.local_path) {
-      console.log(`Downloaded file saved at: ${returnValue.local_path}`);
-      process.exit(0);
+      return;
     }
   }
 

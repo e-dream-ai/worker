@@ -1,7 +1,4 @@
 import { Job } from 'bullmq';
-import { DownloadService } from './download.service.js';
-import { PathResolver } from '../utils/path-resolver.js';
-import env from '../shared/env.js';
 
 interface RunpodStatus {
   status: string;
@@ -14,7 +11,7 @@ interface RunpodStatus {
 }
 
 export class StatusHandlerService {
-  constructor(private readonly downloadService: DownloadService) {}
+  constructor() {}
 
   async handleStatus(endpoint: any, runpodId: string, job: Job): Promise<any> {
     const finalStatus = await this.pollForCompletion(endpoint, runpodId, job);
@@ -65,48 +62,8 @@ export class StatusHandlerService {
     if (!result.video || result.requires_auth) {
       return result;
     }
-
-    if (env.REMOTE_MODE) {
-      return this.handleRemoteMode(result, job);
-    }
-
-    return await this.handleLocalMode(result, job);
-  }
-
-  private async handleRemoteMode(result: any, job: Job): Promise<any> {
-    await job.log(`${new Date().toISOString()}: Remote mode - returning R2 URL for client download`);
+    await job.log(`${new Date().toISOString()}: Returning URL for client download`);
     result.r2_url = result.video;
-    result.remote_mode = true;
     return result;
-  }
-
-  private async handleLocalMode(result: any, job: Job): Promise<any> {
-    try {
-      const localPath = this.resolveLocalPath(job);
-
-      await job.log(`${new Date().toISOString()}: Starting download of video file...`);
-      await this.downloadService.downloadFile(result.video, localPath);
-
-      result.local_path = localPath;
-      result.downloaded_at = new Date().toISOString();
-
-      await job.log(`${new Date().toISOString()}: Video downloaded successfully to ${localPath}`);
-      return result;
-    } catch (downloadError) {
-      console.error(`Failed to download video for job ${job.id}:`, downloadError.message);
-      await job.log(`${new Date().toISOString()}: Download failed: ${downloadError.message}`);
-      result.download_error = downloadError.message;
-      return result;
-    }
-  }
-
-  private resolveLocalPath(job: Job): string {
-    const jobData = job.data as any;
-    return PathResolver.resolveOutputPath({
-      customOutputPath: jobData?.custom_output_path,
-      inputFilePath: jobData?.input_file_path,
-      outputName: jobData?.output_name,
-      jobId: job.id,
-    });
   }
 }

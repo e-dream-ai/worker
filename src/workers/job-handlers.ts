@@ -1,10 +1,8 @@
 import { Job } from 'bullmq';
 import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
-import { DownloadService } from '../services/download.service.js';
 
-const downloadService = new DownloadService();
-const statusHandler = new StatusHandlerService(downloadService);
+const statusHandler = new StatusHandlerService();
 
 export async function handleImageJob(job: Job): Promise<any> {
   const { prompt = 'A walk in the park', seed = 1337, steps = 20, width = 512, height = 512 } = job.data;
