@@ -25,6 +25,7 @@ export class CLIService {
     video: this.createQueueConfig('video'),
     hunyuanvideo: this.createQueueConfig('hunyuanvideo'),
     deforumvideo: this.createQueueConfig('deforumvideo'),
+    uprezvideo: this.createQueueConfig('uprezvideo'),
   };
 
   constructor() {

@@ -32,4 +32,13 @@ program
     await cliService.processJobFile('video', file, options);
   });
 
+program
+  .command('uprez')
+  .description('Queue an uprez video job')
+  .argument('<file>', 'Path to JSON file containing uprez settings')
+  .option('-o, --output <path>', 'Output file path (default: same directory as input file with .mp4 extension)')
+  .action(async (file: string, options) => {
+    await cliService.processJobFile('uprezvideo', file, options);
+  });
+
 program.parse();

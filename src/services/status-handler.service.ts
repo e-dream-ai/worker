@@ -6,6 +6,7 @@ interface RunpodStatus {
   output?: {
     message?: string;
     video?: string;
+    download_url?: string;
     requires_auth?: boolean;
   };
 }
@@ -55,15 +56,17 @@ export class StatusHandlerService {
   }
 
   private hasVideoOutput(result: any): boolean {
-    return !!(result?.message || result?.video);
+    return !!(result?.message || result?.video || result?.download_url);
   }
 
   private async processVideoResult(result: any, job: Job): Promise<any> {
-    if (!result.video || result.requires_auth) {
+    // Normalize uprez output shape: prefer download_url, fallback to video
+    const url = result.download_url || result.video;
+    if (!url || result.requires_auth) {
       return result;
     }
     await job.log(`${new Date().toISOString()}: Returning URL for client download`);
-    result.r2_url = result.video;
+    result.r2_url = url;
     return result;
   }
 }

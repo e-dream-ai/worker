@@ -18,6 +18,7 @@ export const env = cleanEnv(process.env, {
   RUNPOD_HUNYUAN_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_ANIMATEDIFF_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_DEFORUM_ENDPOINT_ID: str({ default: '' }),
+  RUNPOD_UPREZ_ENDPOINT_ID: str({ default: '' }),
 
   ADMIN_PASS: str({ default: '' }),
 });

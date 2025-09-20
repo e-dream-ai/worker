@@ -7,4 +7,5 @@ export const endpoints = {
   animatediff: runpod.endpoint(env.RUNPOD_ANIMATEDIFF_ENDPOINT_ID),
   hunyuan: runpod.endpoint(env.RUNPOD_HUNYUAN_ENDPOINT_ID),
   deforum: runpod.endpoint(env.RUNPOD_DEFORUM_ENDPOINT_ID),
+  uprez: runpod.endpoint(env.RUNPOD_UPREZ_ENDPOINT_ID),
 } as const;

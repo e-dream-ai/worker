@@ -16,6 +16,7 @@ There are two ways to use this project:
 8. In another terminal, run jobs using JSON files:
    - `node dist/prompt.js deforum prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
    - `node dist/prompt.js animatediff prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
+   - `node dist/prompt.js uprez prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
    - By default, output files are saved alongside the input JSON with a `.mp4` extension
    - Use `-o` to specify a custom output path: `node dist/prompt.js deforum prompt/deforum-fish.json -o my-custom-name.mp4`
 
@@ -29,6 +30,7 @@ Required env vars (local development)
 - RUNPOD_ANIMATEDIFF_ENDPOINT_ID
 - RUNPOD_HUNYUAN_ENDPOINT_ID
 - RUNPOD_DEFORUM_ENDPOINT_ID
+- RUNPOD_UPREZ_ENDPOINT_ID
 - ADMIN_PASS (password for username `admin` in the admin UI)
 - Redis: use local redis info (`REDIS_HOST=localhost`, `REDIS_PORT=6379`, `REDIS_PASSWORD=''`).
 
@@ -40,6 +42,8 @@ Required env vars (local development)
 
 ```bash
 node dist/prompt.js animatediff prompt/animatediff-dog.json -o ./out/dog.mp4
+node dist/prompt.js uprez prompt/uprez-example.json -o ./out/uprez.mp4
+node dist/prompt.js deforum prompt/deforum-fish.json -o ./out/deforum.mp4
 ```
 
 How it works

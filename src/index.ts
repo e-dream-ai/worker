@@ -13,12 +13,14 @@ import {
   handleVideoJob,
   handleHunyuanVideoJob,
   handleDeforumVideoJob,
+  handleUprezVideoJob,
 } from './workers/job-handlers.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
 WorkerFactory.createWorker('video', handleVideoJob);
 WorkerFactory.createWorker('hunyuanvideo', handleHunyuanVideoJob);
 WorkerFactory.createWorker('deforumvideo', handleDeforumVideoJob);
+WorkerFactory.createWorker('uprezvideo', handleUprezVideoJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -30,6 +32,9 @@ const animatediffVideoQueue = new Queue('video', {
   connection: redisClient,
 });
 const imageQueue = new Queue('image', {
+  connection: redisClient,
+});
+const uprezVideoQueue = new Queue('uprezvideo', {
   connection: redisClient,
 });
 
@@ -45,6 +50,7 @@ createBullBoard({
     new BullMQAdapter(animatediffVideoQueue),
     new BullMQAdapter(imageQueue),
     new BullMQAdapter(deforumQueue),
+    new BullMQAdapter(uprezVideoQueue),
   ],
   serverAdapter: serverAdapter,
 });

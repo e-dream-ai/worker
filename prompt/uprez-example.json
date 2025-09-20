@@ -1,0 +1,10 @@
+{
+  "video_url": "https://ce1d1f4a175946587269b8503429830b.r2.cloudflarestorage.com/edream-storage-dreams-staging/test-renders/79aa1dcb-f44a-445e-8baf-cd02e2f63176-u1-39_00033.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=e7ab69e29c0160c223813a2ec14bc523%2F20250919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250919T231239Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=1408d5faf1ba77b5cd9c55c3c3742b3b2ed63707e514fad4d3af28bce15fcf74",
+  "upscale_factor": 2,
+  "interpolation_factor": 2,
+  "output_fps": 60,
+  "output_format": "mp4",
+  "tile_size": 1024,
+  "tile_padding": 10,
+  "quality": "high"
+}

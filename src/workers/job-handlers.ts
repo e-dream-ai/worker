@@ -169,6 +169,42 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   return statusHandler.handleStatus(endpoints.deforum, runpodId, job);
 }
 
+export async function handleUprezVideoJob(job: Job): Promise<any> {
+  const {
+    video_url,
+    video_path,
+    upscale_factor = 2,
+    interpolation_factor = 2,
+    output_fps = 30,
+    output_format = 'mp4',
+    tile_size = 512,
+    tile_padding = 10,
+    quality = 'high',
+  } = job.data || {};
+
+  const input: Record<string, unknown> = {
+    upscale_factor,
+    interpolation_factor,
+    output_fps,
+    output_format,
+    tile_size,
+    tile_padding,
+    quality,
+  };
+
+  if (video_url) {
+    input.video_url = video_url;
+  } else if (video_path) {
+    input.video_path = video_path;
+  } else {
+    throw new Error('Either video_url or video_path must be provided');
+  }
+
+  const { id: runpodId } = await endpoints.uprez.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+}
+
 function createAnimatediffWorkflow(params: {
   seed: number;
   steps: number;
