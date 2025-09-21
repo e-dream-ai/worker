@@ -12,10 +12,15 @@ interface RunpodStatus {
 }
 
 export class StatusHandlerService {
-  constructor() {}
+  constructor(private readonly defaultPollIntervalMs: number = 0) {}
 
-  async handleStatus(endpoint: any, runpodId: string, job: Job): Promise<any> {
-    const finalStatus = await this.pollForCompletion(endpoint, runpodId, job);
+  async handleStatus(endpoint: any, runpodId: string, job: Job, pollIntervalMs?: number): Promise<any> {
+    const finalStatus = await this.pollForCompletion(
+      endpoint,
+      runpodId,
+      job,
+      typeof pollIntervalMs === 'number' ? pollIntervalMs : this.defaultPollIntervalMs
+    );
     const result = this.extractResult(finalStatus);
 
     if (!this.hasVideoOutput(result)) {
@@ -25,8 +30,13 @@ export class StatusHandlerService {
     return await this.processVideoResult(result, job);
   }
 
-  private async pollForCompletion(endpoint: any, runpodId: string, job: Job): Promise<RunpodStatus> {
-    let status: RunpodStatus;
+  private async pollForCompletion(
+    endpoint: any,
+    runpodId: string,
+    job: Job,
+    pollIntervalMs: number
+  ): Promise<RunpodStatus> {
+    let status: RunpodStatus | undefined;
     let lastLogMessage = '';
 
     do {
@@ -39,16 +49,20 @@ export class StatusHandlerService {
           lastLogMessage = logMessage;
           await job.log(`${new Date().toISOString()}: ${logMessage}`);
         }
+      } catch (error: any) {
+        console.error('Error getting endpoint status:', error?.message ?? error);
+      }
 
-        if (status.status === 'FAILED') {
-          throw new Error(JSON.stringify(status));
-        }
-      } catch (error) {
-        console.error('Error getting endpoint status:', error.message);
+      if (status?.status === 'FAILED') {
+        await job.log(`${new Date().toISOString()}: Remote job FAILED: ${JSON.stringify(status)}`);
+        throw new Error(JSON.stringify(status));
+      }
+      if (status?.completed === false && pollIntervalMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       }
     } while (status?.completed === false);
 
-    return status;
+    return status as RunpodStatus;
   }
 
   private extractResult(status: RunpodStatus): any {

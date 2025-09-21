@@ -202,7 +202,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.uprez.run({ input });
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+  return statusHandler.handleStatus(endpoints.uprez, runpodId, job, 1000);
 }
 
 function createAnimatediffWorkflow(params: {
