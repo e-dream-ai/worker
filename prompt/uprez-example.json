@@ -1,8 +1,7 @@
 {
-  "video_url": "https://ce1d1f4a175946587269b8503429830b.r2.cloudflarestorage.com/edream-storage-dreams-alpha/b909fcb6-4cc4-4817-b82a-2ab66c3f71f9/d5868618-8106-4764-aa49-c8d0e0d29ebf/d5868618-8106-4764-aa49-c8d0e0d29ebf_processed.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Checksum-Mode=ENABLED&X-Amz-Credential=ca9375c526f8184e3c646a03d5ddd114%2F20250921%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250921T200039Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&x-id=GetObject&X-Amz-Signature=06327ee7af10a08c9ecb384cc5410288d836fac312411ebc227e5786454e82b1",
+  "video_url": "https://ce1d1f4a175946587269b8503429830b.r2.cloudflarestorage.com/edream-storage-dreams-alpha/b909fcb6-4cc4-4817-b82a-2ab66c3f71f9/d5868618-8106-4764-aa49-c8d0e0d29ebf/d5868618-8106-4764-aa49-c8d0e0d29ebf.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Checksum-Mode=ENABLED&X-Amz-Credential=ca9375c526f8184e3c646a03d5ddd114%2F20250922%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250922T192745Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&x-id=GetObject&X-Amz-Signature=c0702781dde97170071145ba8cae2bedad18bd2938b1015c68d90b77e1903056",
   "upscale_factor": 2,
   "interpolation_factor": 2,
-  "output_fps": 60,
   "output_format": "mp4",
   "tile_size": 1024,
   "tile_padding": 10,
