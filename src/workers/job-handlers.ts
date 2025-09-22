@@ -172,6 +172,7 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
 export async function handleUprezVideoJob(job: Job): Promise<any> {
   const {
     video_url,
+    video_uuid,
     video_path,
     upscale_factor = 2,
     interpolation_factor = 2,
@@ -195,12 +196,20 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     input.output_fps = output_fps;
   }
 
+  const provided = [video_url, video_uuid, video_path].filter(Boolean);
+  if (provided.length === 0) {
+    throw new Error("Provide one of 'video_url', 'video_uuid', or 'video_path'");
+  }
+  if (provided.length > 1) {
+    throw new Error("Provide only one of 'video_url', 'video_uuid', or 'video_path'");
+  }
+
   if (video_url) {
     input.video_url = video_url;
+  } else if (video_uuid) {
+    input.video_uuid = video_uuid;
   } else if (video_path) {
     input.video_path = video_path;
-  } else {
-    throw new Error('Either video_url or video_path must be provided');
   }
 
   const { id: runpodId } = await endpoints.uprez.run({ input });
