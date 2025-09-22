@@ -175,7 +175,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     video_path,
     upscale_factor = 2,
     interpolation_factor = 2,
-    output_fps = 30,
+    output_fps,
     output_format = 'mp4',
     tile_size = 512,
     tile_padding = 10,
@@ -185,12 +185,15 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
   const input: Record<string, unknown> = {
     upscale_factor,
     interpolation_factor,
-    output_fps,
     output_format,
     tile_size,
     tile_padding,
     quality,
   };
+
+  if (typeof output_fps === 'number') {
+    input.output_fps = output_fps;
+  }
 
   if (video_url) {
     input.video_url = video_url;
