@@ -127,6 +127,7 @@ export class CLIService {
 
       const returnValue = job?.returnvalue as any;
       await this.handleJobResult(returnValue, job);
+      process.exit(0);
     } catch (error) {
       console.error(
         `\n${new Date().toISOString()}: Error retrieving completed job ${data.jobId} from ${queueName}:`,
@@ -173,6 +174,9 @@ export class CLIService {
 
       const job = await Job.fromId(queue, data.jobId);
       console.log(`\n${new Date().toISOString()}: Job failed: ${job?.failedReason} for job ${JSON.stringify(job?.id)}`);
+      if (this.queuedJobIds.has(data.jobId)) {
+        process.exit(1);
+      }
     } catch (error) {
       console.error(
         `\n${new Date().toISOString()}: Error retrieving failed job ${data.jobId} from ${queueName}:`,
