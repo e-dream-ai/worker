@@ -32,6 +32,45 @@ export class CLIService {
     this.setupEventListeners();
   }
 
+  async processJobFileAuto(filePath: string, options: JobOptions): Promise<void> {
+    this.validateInputFile(filePath);
+
+    const jsonData = this.readJsonFile(filePath);
+    const jobOptions = this.createJobOptions(filePath, options);
+
+    const queueName = this.inferQueueName(jsonData);
+    const jobs = await this.queueJob(queueName, jsonData, jobOptions);
+    this.trackJobs(jobs);
+  }
+
+  private inferQueueName(jsonData: any): string {
+    const algoRaw: unknown = jsonData?.infinidream_algorithm;
+    const algorithm = String(algoRaw || '')
+      .toLowerCase()
+      .trim();
+
+    if (!algorithm) {
+      throw new InvalidArgumentError(
+        "Missing 'infinidream_algorithm'. Allowed values: animatediff, hunyuan, deforum, uprez"
+      );
+    }
+
+    switch (algorithm) {
+      case 'animatediff':
+        return 'video';
+      case 'hunyuan':
+        return 'hunyuanvideo';
+      case 'deforum':
+        return 'deforumvideo';
+      case 'uprez':
+        return 'uprezvideo';
+      default:
+        throw new InvalidArgumentError(
+          `Unknown 'infinidream_algorithm': ${algorithm}. Allowed values: animatediff, hunyuan, deforum, uprez`
+        );
+    }
+  }
+
   async processJobFile(queueName: string, filePath: string, options: JobOptions): Promise<void> {
     this.validateInputFile(filePath);
 

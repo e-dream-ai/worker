@@ -1,4 +1,5 @@
 {
+  "infinidream_algorithm": "animatediff",
   "prompts": {
     "0": "a dog at park scene at afternoon",
     "32": "a dog running through the park",

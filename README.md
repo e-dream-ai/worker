@@ -14,11 +14,11 @@ There are two ways to use this project:
 6. Build: `npm run build`
 7. Start the worker and admin UI: `npm start`
 8. In another terminal, run jobs using JSON files:
-   - `node dist/prompt.js deforum prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
-   - `node dist/prompt.js animatediff prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
-   - `node dist/prompt.js uprez prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
+   - `node dist/prompt.js prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
+   - `node dist/prompt.js prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
+   - `node dist/prompt.js prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
    - By default, output files are saved alongside the input JSON with a `.mp4` extension
-   - Use `-o` to specify a custom output path: `node dist/prompt.js deforum prompt/deforum-fish.json -o my-custom-name.mp4`
+   - Use `-o` to specify a custom output path: `node dist/prompt.js prompt/deforum-fish.json -o my-custom-name.mp4`
 
 Notes:
 
@@ -41,9 +41,9 @@ Required env vars (local development)
    - Required: `REDISCLOUD_URL`
 
 ```bash
-node dist/prompt.js animatediff prompt/animatediff-dog.json -o ./out/dog.mp4
-node dist/prompt.js uprez prompt/uprez-example.json -o ./out/uprez.mp4
-node dist/prompt.js deforum prompt/deforum-fish.json -o ./out/deforum.mp4
+node dist/prompt.js prompt/animatediff-dog.json -o ./out/dog.mp4
+node dist/prompt.js prompt/uprez-example.json -o ./out/uprez.mp4
+node dist/prompt.js prompt/deforum-fish.json -o ./out/deforum.mp4
 ```
 
 How it works
