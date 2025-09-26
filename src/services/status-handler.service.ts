@@ -12,7 +12,7 @@ interface RunpodStatus {
 }
 
 export class StatusHandlerService {
-  constructor(private readonly defaultPollIntervalMs: number = 0) {}
+  constructor(private readonly defaultPollIntervalMs: number = 1000) {}
 
   async handleStatus(endpoint: any, runpodId: string, job: Job, pollIntervalMs?: number): Promise<any> {
     const finalStatus = await this.pollForCompletion(
