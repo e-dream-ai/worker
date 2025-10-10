@@ -1,0 +1,10 @@
+{
+  "infinidream_algorithm": "uprez",
+  "video_uuid": "d3f06c44-b453-4ea8-8985-fe0f97d607fe",
+  "upscale_factor": 2,
+  "interpolation_factor": 2,
+  "output_format": "mp4",
+  "tile_size": 1024,
+  "tile_padding": 10,
+  "quality": "high"
+}
