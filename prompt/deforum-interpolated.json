@@ -1,0 +1,14 @@
+{
+  "infinidream_algorithm": "deforum",
+  "0": "robotic nudibranch",
+  "width": 1024,
+  "height": 576,
+  "max_frames": 600,
+  "fps": 15,
+  "frame_interpolation_engine": "FILM",
+  "frame_interpolation_x_amount": 2,
+  "frame_interpolation_slow_mo_enabled": false,
+  "frame_interpolation_slow_mo_amount": 2,
+  "frame_interpolation_keep_imgs": false,
+  "frame_interpolation_use_upscaled": false
+}
