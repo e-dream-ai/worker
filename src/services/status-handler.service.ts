@@ -52,7 +52,6 @@ export class StatusHandlerService {
       try {
         const rawStatus = await endpoint.status(runpodId);
 
-        // Convert public endpoint response to common format
         if (isPublicEndpoint) {
           const publicStatus = rawStatus as PublicEndpointResponse;
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
