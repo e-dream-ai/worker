@@ -17,6 +17,9 @@ There are two ways to use this project:
    - `node dist/prompt.js prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
    - `node dist/prompt.js prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
    - `node dist/prompt.js prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
+   - `node dist/prompt.js prompt/wan-t2v-example.json` (creates `prompt/wan-t2v-example.mp4`)
+   - `node dist/prompt.js prompt/wan-i2v-example.json` (creates `prompt/wan-i2v-example.mp4`)
+   - `node dist/prompt.js prompt/wan-i2v-lora-example.json` (creates `prompt/wan-i2v-lora-example.mp4`)
    - By default, output files are saved alongside the input JSON with a `.mp4` extension
    - Use `-o` to specify a custom output path: `node dist/prompt.js prompt/deforum-fish.json -o my-custom-name.mp4`
 
@@ -34,6 +37,8 @@ Required env vars (local development)
 - ADMIN_PASS (password for username `admin` in the admin UI)
 - Redis: use local redis info (`REDIS_HOST=localhost`, `REDIS_PORT=6379`, `REDIS_PASSWORD=''`).
 
+Note: Public endpoints like `wan-t2v`, `wan-i2v`, and `wan-i2v-lora` only require `RUNPOD_API_KEY` (no endpoint ID needed).
+
 ### B) Use deployed worker only (no local server)
 
 1. Build once: `npm run build`
@@ -44,6 +49,9 @@ Required env vars (local development)
 node dist/prompt.js prompt/animatediff-dog.json -o ./out/dog.mp4
 node dist/prompt.js prompt/uprez-example.json -o ./out/uprez.mp4
 node dist/prompt.js prompt/deforum-fish.json -o ./out/deforum.mp4
+node dist/prompt.js prompt/wan-t2v-example.json -o ./out/wan-t2v.mp4
+node dist/prompt.js prompt/wan-i2v-example.json -o ./out/wan-i2v.mp4
+node dist/prompt.js prompt/wan-i2v-lora-example.json -o ./out/wan-i2v-lora.mp4
 ```
 
 How it works

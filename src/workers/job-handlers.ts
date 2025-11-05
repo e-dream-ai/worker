@@ -1,8 +1,64 @@
 import { Job } from 'bullmq';
+import { readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
 
 const statusHandler = new StatusHandlerService();
+
+interface Wan22T2V720Params {
+  prompt: string;
+  size?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  num_inference_steps?: number;
+  guidance?: number;
+  seed?: number;
+  negative_prompt?: string;
+  temperature?: number;
+  flow_shift?: number;
+  max_tokens?: number;
+  enable_prompt_optimization?: boolean;
+  enable_safety_checker?: boolean;
+}
+
+interface Wan22I2V720Params {
+  prompt: string;
+  image: string;
+  size?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  num_inference_steps?: number;
+  guidance?: number;
+  seed?: number;
+  negative_prompt?: string;
+  temperature?: number;
+  flow_shift?: number;
+  max_tokens?: number;
+  enable_prompt_optimization?: boolean;
+  enable_safety_checker?: boolean;
+}
+
+interface LoRAConfig {
+  path: string;
+  scale: number;
+}
+
+interface Wan22I2VLoraParams {
+  prompt: string;
+  image?: string;
+  last_image?: string;
+  duration?: number;
+  seed?: number;
+  loras?: LoRAConfig[];
+  high_noise_loras?: LoRAConfig[];
+  low_noise_loras?: LoRAConfig[];
+  enable_base64_output?: boolean;
+  enable_sync_mode?: boolean;
+  enable_safety_checker?: boolean;
+}
 
 export async function handleImageJob(job: Job): Promise<any> {
   const { prompt = 'A walk in the park', seed = 1337, steps = 20, width = 512, height = 512 } = job.data;
@@ -215,6 +271,223 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
   const { id: runpodId } = await endpoints.uprez.run({ input });
   await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+}
+
+export async function handleWanT2VJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    size,
+    width,
+    height,
+    duration = 8,
+    num_inference_steps = 30,
+    guidance = 5,
+    seed = -1,
+    negative_prompt = '',
+    temperature,
+    flow_shift = 5,
+    max_tokens,
+    enable_prompt_optimization = false,
+    enable_safety_checker = true,
+  } = job.data as Wan22T2V720Params;
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  // Build input parameters
+  const input: Record<string, unknown> = {
+    prompt,
+    duration,
+    num_inference_steps,
+    guidance,
+    seed,
+    negative_prompt,
+    flow_shift,
+    enable_prompt_optimization,
+    enable_safety_checker,
+  };
+
+  if (size) {
+    if (typeof size !== 'string') {
+      throw new Error('size must be a string in format "1280*720"');
+    }
+    input.size = size;
+  } else if (width || height) {
+    if (width && typeof width === 'number') {
+      input.width = width;
+    }
+    if (height && typeof height === 'number') {
+      input.height = height;
+    }
+  }
+
+  // Add optional parameters only if they are provided
+  if (temperature !== undefined && temperature !== null) {
+    input.temperature = temperature;
+  }
+  if (max_tokens !== undefined && max_tokens !== null) {
+    input.max_tokens = max_tokens;
+  }
+
+  const { id: runpodId } = await endpoints.wanT2V.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
+}
+
+export async function handleWanI2VJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    image,
+    size,
+    width,
+    height,
+    duration = 5,
+    num_inference_steps = 30,
+    guidance = 5,
+    seed = -1,
+    negative_prompt = '',
+    temperature,
+    flow_shift = 5,
+    max_tokens,
+    enable_prompt_optimization = false,
+    enable_safety_checker = true,
+  } = job.data as Wan22I2V720Params;
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  if (!image || typeof image !== 'string') {
+    throw new Error('image is required and must be a string URL or local file path');
+  }
+
+  // Build input parameters
+  const input: Record<string, unknown> = {
+    prompt,
+    image: convertImageToBase64IfNeeded(image),
+    duration,
+    num_inference_steps,
+    guidance,
+    seed,
+    negative_prompt,
+    flow_shift,
+    enable_prompt_optimization,
+    enable_safety_checker,
+  };
+
+  if (size) {
+    if (typeof size !== 'string') {
+      throw new Error('size must be a string in format "1280*720"');
+    }
+    input.size = size;
+  } else if (width || height) {
+    if (width && typeof width === 'number') {
+      input.width = width;
+    }
+    if (height && typeof height === 'number') {
+      input.height = height;
+    }
+  }
+
+  // Add optional parameters only if they are provided
+  if (temperature !== undefined && temperature !== null) {
+    input.temperature = temperature;
+  }
+  if (max_tokens !== undefined && max_tokens !== null) {
+    input.max_tokens = max_tokens;
+  }
+
+  const { id: runpodId } = await endpoints.wanI2V.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
+}
+
+function convertImageToBase64IfNeeded(imagePath: string): string {
+  const isUrl = imagePath.startsWith('http://') || imagePath.startsWith('https://');
+
+  if (isUrl) {
+    return imagePath;
+  }
+
+  if (!existsSync(imagePath)) {
+    throw new Error(`Image file not found: ${imagePath}`);
+  }
+
+  try {
+    const imageBuffer = readFileSync(imagePath);
+    return imageBuffer.toString('base64');
+  } catch (error: any) {
+    throw new Error(`Failed to read image file ${imagePath}: ${error.message}`);
+  }
+}
+
+export async function handleWanI2VLoraJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    image,
+    last_image,
+    duration = 5,
+    seed = -1,
+    loras,
+    high_noise_loras,
+    low_noise_loras,
+    enable_base64_output = false,
+    enable_sync_mode = false,
+    enable_safety_checker = true,
+  } = job.data as Wan22I2VLoraParams;
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  const input: Record<string, unknown> = {
+    prompt,
+    duration,
+    seed,
+    enable_base64_output,
+    enable_sync_mode,
+    enable_safety_checker,
+  };
+
+  if (image) {
+    if (typeof image !== 'string') {
+      throw new Error('image must be a string URL or local file path');
+    }
+    input.image = convertImageToBase64IfNeeded(image);
+  }
+
+  if (last_image) {
+    if (typeof last_image !== 'string') {
+      throw new Error('last_image must be a string URL or local file path');
+    }
+    input.last_image = convertImageToBase64IfNeeded(last_image);
+  }
+
+  if (loras && Array.isArray(loras)) {
+    const validLoras = loras.filter((lora) => lora && lora.path && lora.path.trim() !== '');
+    if (validLoras.length > 0) {
+      input.loras = validLoras;
+    }
+  }
+
+  if (high_noise_loras && Array.isArray(high_noise_loras)) {
+    const validLoras = high_noise_loras.filter((lora) => lora && lora.path && lora.path.trim() !== '');
+    if (validLoras.length > 0) {
+      input.high_noise_loras = validLoras;
+    }
+  }
+
+  if (low_noise_loras && Array.isArray(low_noise_loras)) {
+    const validLoras = low_noise_loras.filter((lora) => lora && lora.path && lora.path.trim() !== '');
+    if (validLoras.length > 0) {
+      input.low_noise_loras = validLoras;
+    }
+  }
+
+  const { id: runpodId } = await endpoints.wanI2VLora.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
 }
 
 function createAnimatediffWorkflow(params: {
