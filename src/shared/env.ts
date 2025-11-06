@@ -31,6 +31,8 @@ export const env = cleanEnv(process.env, {
   R2_IMAGE_DIRECTORY: str({ default: 'image-inputs' }),
   R2_PRESIGNED_EXPIRY: str({ default: '86400' }),
 
+  WORKER_URL: str({ default: 'http://localhost:3000' }),
+
   ADMIN_PASS: str({ default: '' }),
 });
 

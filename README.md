@@ -28,13 +28,15 @@ There are two ways to use this project:
 
    **Option 2: Automatic image upload (for jobs with local image files)**
 
-   - `npm run submit prompt/wan-i2v-example.json` (automatically uploads local images to R2)
+   - `npm run submit prompt/wan-i2v-example.json` (automatically uploads local images via worker endpoint)
    - `npm run submit prompt/wan-i2v-local-example.json -o ./output/video.mp4`
    - This script automatically:
      - Detects local image paths in `image` and `last_image` fields
-     - Uploads them to R2 before submitting the job
-     - Replaces paths with presigned URLs
-     - Works with both local development and deployed workers
+     - Uploads them to the worker's `/api/upload-image` endpoint
+     - Worker uploads to R2 and returns presigned URLs
+     - Replaces paths with presigned URLs in JSON
+     - Submits job normally
+   - **No R2 credentials needed locally** - worker handles all R2 operations
    - See [Automatic Image Upload](#automatic-image-upload) section for details
 
 Notes:
@@ -55,11 +57,7 @@ Note: Public endpoints like `wan-t2v`, `wan-i2v`, and `wan-i2v-lora` only requir
 
 For automatic image upload (submit-job script), also required:
 
-- R2_ENDPOINT_URL
-- R2_ACCESS_KEY_ID
-- R2_SECRET_ACCESS_KEY
-- R2_BUCKET_NAME
-- R2_IMAGE_DIRECTORY (optional, defaults to `image-inputs`)
+- `WORKER_URL` (defaults to `http://localhost:3000` for local, or your deployed worker URL like `https://gpu-worker.herokuapp.com`)
 
 ### B) Use deployed worker only (no local server)
 

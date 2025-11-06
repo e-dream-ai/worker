@@ -131,6 +131,32 @@ export class R2UploadService {
     return await this.generatePresignedUrl(objectKey);
   }
 
+  async uploadImageBufferToR2(imageBuffer: Buffer, jobId: string, filename?: string): Promise<string> {
+    if (!this.s3Client) {
+      throw new Error(
+        'R2 is not configured. Please set R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.'
+      );
+    }
+
+    const fileExtension = filename ? extname(filename).toLowerCase() : '.png';
+    const contentType = this.getMimeTypeFromExtension(fileExtension);
+
+    const objectKey = filename
+      ? `${this.imageDirectory}/${filename}`
+      : `${this.imageDirectory}/${jobId}-${Date.now()}${fileExtension}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: objectKey,
+      Body: imageBuffer,
+      ContentType: contentType,
+    });
+
+    await this.s3Client.send(command);
+
+    return await this.generatePresignedUrl(objectKey);
+  }
+
   private getMimeTypeFromExtension(extension: string): string {
     const extToMime: Record<string, string> = {
       '.jpg': 'image/jpeg',

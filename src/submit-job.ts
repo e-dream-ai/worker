@@ -1,11 +1,11 @@
 import { program } from 'commander';
 import fs from 'fs';
 import path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
+import FormData from 'form-data';
 import { CLIService } from './services/cli.service.js';
-import { R2UploadService } from './services/r2-upload.service.js';
+import env from './shared/env.js';
 
-const r2UploadService = new R2UploadService();
 const cliService = new CLIService();
 
 interface JobData {
@@ -14,7 +14,28 @@ interface JobData {
   last_image?: string;
 }
 
-async function findAndUploadImages(data: JobData, baseDir: string, jobId: string): Promise<JobData> {
+async function uploadImageToWorker(imagePath: string, workerUrl: string): Promise<string> {
+  const formData = new FormData();
+  const imageBuffer = readFileSync(imagePath);
+  const filename = path.basename(imagePath);
+  formData.append('image', imageBuffer, filename);
+
+  const response = await fetch(`${workerUrl}/api/upload-image`, {
+    method: 'POST',
+    body: formData as any,
+    headers: formData.getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Worker upload failed: ${response.status} ${response.statusText}. ${errorText}`);
+  }
+
+  const data = (await response.json()) as { url: string };
+  return data.url;
+}
+
+async function findAndUploadImages(data: JobData, baseDir: string, workerUrl: string): Promise<JobData> {
   const result = { ...data };
   const imageFields = ['image', 'last_image'];
 
@@ -53,10 +74,10 @@ async function findAndUploadImages(data: JobData, baseDir: string, jobId: string
     }
 
     try {
-      console.log(`Uploading ${field}: ${resolvedPath}...`);
-      const presignedUrl = await r2UploadService.uploadImageToR2(resolvedPath, jobId);
+      console.log(`Uploading ${field} to worker: ${resolvedPath}...`);
+      const presignedUrl = await uploadImageToWorker(resolvedPath, workerUrl);
       result[field] = presignedUrl;
-      console.log(`${field} uploaded to R2: ${presignedUrl.substring(0, 80)}...`);
+      console.log(`${field} uploaded: ${presignedUrl.substring(0, 80)}...`);
     } catch (error: any) {
       console.error(`Failed to upload ${field} (${resolvedPath}): ${error.message}`);
       throw new Error(`Failed to upload image for ${field}: ${error.message}`);
@@ -78,14 +99,14 @@ async function submitJobWithImageUpload(filePath: string, options: { output?: st
   const raw = fs.readFileSync(filePath, 'utf8');
   const jsonData: JobData = JSON.parse(raw);
 
-  const tempJobId = `temp-${Date.now()}`;
-
   const baseDir = path.dirname(path.resolve(filePath));
+  const workerUrl = env.WORKER_URL;
 
   console.log(`Processing job file: ${filePath}`);
   console.log(`Base directory: ${baseDir}`);
+  console.log(`Worker URL: ${workerUrl}`);
 
-  const processedData = await findAndUploadImages(jsonData, baseDir, tempJobId);
+  const processedData = await findAndUploadImages(jsonData, baseDir, workerUrl);
 
   const tempFilePath = path.join(baseDir, `.${path.basename(filePath, '.json')}.processed.json`);
   fs.writeFileSync(tempFilePath, JSON.stringify(processedData, null, 2));
