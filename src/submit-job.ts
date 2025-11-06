@@ -26,14 +26,14 @@ async function findAndUploadImages(data: JobData, baseDir: string, jobId: string
     }
 
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      console.log(`✓ ${field} is already a URL: ${imagePath}`);
+      console.log(`${field} is already a URL: ${imagePath}`);
       continue;
     }
 
     if (!imagePath.includes('/') && !imagePath.includes('\\')) {
       try {
         Buffer.from(imagePath, 'base64');
-        console.log(`✓ ${field} appears to be base64, skipping upload`);
+        console.log(`${field} appears to be base64, skipping upload`);
         continue;
       } catch {
         // Not base64, continue to check if it's a file path
@@ -48,17 +48,17 @@ async function findAndUploadImages(data: JobData, baseDir: string, jobId: string
     }
 
     if (!existsSync(resolvedPath)) {
-      console.warn(`⚠ ${field} path "${imagePath}" (resolved: ${resolvedPath}) not found, skipping upload`);
+      console.warn(`${field} path "${imagePath}" (resolved: ${resolvedPath}) not found, skipping upload`);
       continue;
     }
 
     try {
-      console.log(`📤 Uploading ${field}: ${resolvedPath}...`);
+      console.log(`Uploading ${field}: ${resolvedPath}...`);
       const presignedUrl = await r2UploadService.uploadImageToR2(resolvedPath, jobId);
       result[field] = presignedUrl;
-      console.log(`✓ ${field} uploaded to R2: ${presignedUrl.substring(0, 80)}...`);
+      console.log(`${field} uploaded to R2: ${presignedUrl.substring(0, 80)}...`);
     } catch (error: any) {
-      console.error(`❌ Failed to upload ${field} (${resolvedPath}): ${error.message}`);
+      console.error(`Failed to upload ${field} (${resolvedPath}): ${error.message}`);
       throw new Error(`Failed to upload image for ${field}: ${error.message}`);
     }
   }
@@ -96,7 +96,7 @@ async function submitJobWithImageUpload(filePath: string, options: { output?: st
   } finally {
     if (existsSync(tempFilePath)) {
       fs.unlinkSync(tempFilePath);
-      console.log(`🧹 Cleaned up temporary file: ${tempFilePath}`);
+      console.log(`Cleaned up temporary file: ${tempFilePath}`);
     }
   }
 }
@@ -110,7 +110,7 @@ program
     try {
       await submitJobWithImageUpload(file, options);
     } catch (error: any) {
-      console.error(`\n❌ Error: ${error.message}`);
+      console.error(`\nError: ${error.message}`);
       process.exit(1);
     }
   });
