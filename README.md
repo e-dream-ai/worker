@@ -14,6 +14,9 @@ There are two ways to use this project:
 6. Build: `npm run build`
 7. Start the worker and admin UI: `npm start`
 8. In another terminal, run jobs using JSON files:
+
+   **Option 1: Standard submission (for jobs without local images or with URLs/base64)**
+
    - `node dist/prompt.js prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
    - `node dist/prompt.js prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
    - `node dist/prompt.js prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
@@ -22,6 +25,17 @@ There are two ways to use this project:
    - `node dist/prompt.js prompt/wan-i2v-lora-example.json` (creates `prompt/wan-i2v-lora-example.mp4`)
    - By default, output files are saved alongside the input JSON with a `.mp4` extension
    - Use `-o` to specify a custom output path: `node dist/prompt.js prompt/deforum-fish.json -o my-custom-name.mp4`
+
+   **Option 2: Automatic image upload (for jobs with local image files)**
+
+   - `npm run submit prompt/wan-i2v-example.json` (automatically uploads local images to R2)
+   - `npm run submit prompt/wan-i2v-local-example.json -o ./output/video.mp4`
+   - This script automatically:
+     - Detects local image paths in `image` and `last_image` fields
+     - Uploads them to R2 before submitting the job
+     - Replaces paths with presigned URLs
+     - Works with both local development and deployed workers
+   - See [Automatic Image Upload](#automatic-image-upload) section for details
 
 Notes:
 
@@ -38,6 +52,14 @@ Required env vars (local development)
 - Redis: use local redis info (`REDIS_HOST=localhost`, `REDIS_PORT=6379`, `REDIS_PASSWORD=''`).
 
 Note: Public endpoints like `wan-t2v`, `wan-i2v`, and `wan-i2v-lora` only require `RUNPOD_API_KEY` (no endpoint ID needed).
+
+For automatic image upload (submit-job script), also required:
+
+- R2_ENDPOINT_URL
+- R2_ACCESS_KEY_ID
+- R2_SECRET_ACCESS_KEY
+- R2_BUCKET_NAME
+- R2_IMAGE_DIRECTORY (optional, defaults to `image-inputs`)
 
 ### B) Use deployed worker only (no local server)
 
