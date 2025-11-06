@@ -15,8 +15,6 @@ There are two ways to use this project:
 7. Start the worker and admin UI: `npm start`
 8. In another terminal, run jobs using JSON files:
 
-   **Option 1: Standard submission (for jobs without local images or with URLs/base64)**
-
    - `node dist/prompt.js prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
    - `node dist/prompt.js prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
    - `node dist/prompt.js prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
@@ -26,18 +24,16 @@ There are two ways to use this project:
    - By default, output files are saved alongside the input JSON with a `.mp4` extension
    - Use `-o` to specify a custom output path: `node dist/prompt.js prompt/deforum-fish.json -o my-custom-name.mp4`
 
-   **Option 2: Automatic image upload (for jobs with local image files)**
+   **Automatic Image Upload (wan-i2v and wan-i2v-lora only):**
 
-   - `npm run submit prompt/wan-i2v-example.json` (automatically uploads local images via worker endpoint)
-   - `npm run submit prompt/wan-i2v-local-example.json -o ./output/video.mp4`
-   - This script automatically:
-     - Detects local image paths in `image` and `last_image` fields
-     - Uploads them to the worker's `/api/upload-image` endpoint
-     - Worker uploads to R2 and returns presigned URLs
-     - Replaces paths with presigned URLs in JSON
-     - Submits job normally
-   - **No R2 credentials needed locally** - worker handles all R2 operations
-   - See [Automatic Image Upload](#automatic-image-upload) section for details
+   For `wan-i2v` and `wan-i2v-lora` jobs, the CLI automatically:
+
+   - Detects local image paths in `image` and `last_image` fields
+   - Uploads them to the worker's `/api/upload-image` endpoint
+   - Worker uploads to R2 and returns presigned URLs
+   - Replaces paths with presigned URLs before submitting
+
+   Example: `node dist/prompt.js prompt/wan-i2v-local-example.json` (automatically uploads local images)
 
 Notes:
 
@@ -55,7 +51,7 @@ Required env vars (local development)
 
 Note: Public endpoints like `wan-t2v`, `wan-i2v`, and `wan-i2v-lora` only require `RUNPOD_API_KEY` (no endpoint ID needed).
 
-For automatic image upload (submit-job script), also required:
+For automatic image upload (wan-i2v and wan-i2v-lora jobs), also required:
 
 - `WORKER_URL` (defaults to `http://localhost:3000` for local, or your deployed worker URL like `https://gpu-worker.herokuapp.com`)
 

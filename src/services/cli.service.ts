@@ -2,8 +2,11 @@ import { Job, Queue, QueueEvents } from 'bullmq';
 import fs from 'fs';
 import path from 'path';
 import { InvalidArgumentError } from 'commander';
+import FormData from 'form-data';
+import { existsSync, readFileSync } from 'fs';
 import { DownloadService } from './download.service.js';
 import { PathResolver } from '../utils/path-resolver.js';
+import env from '../shared/env.js';
 import redisClient from '../shared/redis.js';
 
 interface JobOptions {
@@ -38,10 +41,14 @@ export class CLIService {
   async processJobFileAuto(filePath: string, options: JobOptions): Promise<void> {
     this.validateInputFile(filePath);
 
-    const jsonData = this.readJsonFile(filePath);
-    const jobOptions = this.createJobOptions(filePath, options);
-
+    let jsonData = this.readJsonFile(filePath);
     const queueName = this.inferQueueName(jsonData);
+
+    if (queueName === 'wani2v' || queueName === 'wani2vlora') {
+      jsonData = await this.processImagesForWanI2V(jsonData, filePath);
+    }
+
+    const jobOptions = this.createJobOptions(filePath, options);
     const jobs = await this.queueJob(queueName, jsonData, jobOptions);
     this.trackJobs(jobs);
   }
@@ -241,5 +248,78 @@ export class CLIService {
     } else {
       process.stdout.write('.');
     }
+  }
+
+  private async uploadImageToWorker(imagePath: string, workerUrl: string): Promise<string> {
+    const formData = new FormData();
+    const imageBuffer = readFileSync(imagePath);
+    const filename = path.basename(imagePath);
+    formData.append('image', imageBuffer, filename);
+
+    const response = await fetch(`${workerUrl}/api/upload-image`, {
+      method: 'POST',
+      body: formData as any,
+      headers: formData.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Worker upload failed: ${response.status} ${response.statusText}. ${errorText}`);
+    }
+
+    const data = (await response.json()) as { url: string };
+    return data.url;
+  }
+
+  private async processImagesForWanI2V(jsonData: any, filePath: string): Promise<any> {
+    const result = { ...jsonData };
+    const imageFields = ['image', 'last_image'];
+    const baseDir = path.dirname(path.resolve(filePath));
+    const workerUrl = env.WORKER_URL;
+
+    for (const field of imageFields) {
+      const imagePath = result[field] as string | undefined;
+
+      if (!imagePath || typeof imagePath !== 'string') {
+        continue;
+      }
+
+      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        continue;
+      }
+
+      if (!imagePath.includes('/') && !imagePath.includes('\\')) {
+        try {
+          Buffer.from(imagePath, 'base64');
+          continue;
+        } catch {
+          // Not base64, continue to check if it's a file path
+        }
+      }
+
+      let resolvedPath: string;
+      if (path.isAbsolute(imagePath)) {
+        resolvedPath = imagePath;
+      } else {
+        resolvedPath = path.resolve(baseDir, imagePath);
+      }
+
+      if (!existsSync(resolvedPath)) {
+        console.warn(`${field} path "${imagePath}" not found, skipping upload`);
+        continue;
+      }
+
+      try {
+        console.log(`Uploading ${field} to worker: ${resolvedPath}...`);
+        const presignedUrl = await this.uploadImageToWorker(resolvedPath, workerUrl);
+        result[field] = presignedUrl;
+        console.log(`${field} uploaded: ${presignedUrl.substring(0, 80)}...`);
+      } catch (error: any) {
+        console.error(`Failed to upload ${field} (${resolvedPath}): ${error.message}`);
+        throw new Error(`Failed to upload image for ${field}: ${error.message}`);
+      }
+    }
+
+    return result;
   }
 }
