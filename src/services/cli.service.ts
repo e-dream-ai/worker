@@ -4,6 +4,7 @@ import path from 'path';
 import { InvalidArgumentError } from 'commander';
 import FormData from 'form-data';
 import { existsSync, readFileSync } from 'fs';
+import { request } from 'undici';
 import { DownloadService } from './download.service.js';
 import { PathResolver } from '../utils/path-resolver.js';
 import env from '../shared/env.js';
@@ -256,18 +257,18 @@ export class CLIService {
     const filename = path.basename(imagePath);
     formData.append('image', imageBuffer, filename);
 
-    const response = await fetch(`${workerUrl}/api/upload-image`, {
+    const { statusCode, body } = await request(`${workerUrl}/api/upload-image`, {
       method: 'POST',
-      body: formData as any,
+      body: formData,
       headers: formData.getHeaders(),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Worker upload failed: ${response.status} ${response.statusText}. ${errorText}`);
+    if (statusCode !== 200) {
+      const errorText = await body.text();
+      throw new Error(`Worker upload failed: ${statusCode} ${errorText}`);
     }
 
-    const data = (await response.json()) as { url: string };
+    const data = (await body.json()) as { url: string };
     return data.url;
   }
 

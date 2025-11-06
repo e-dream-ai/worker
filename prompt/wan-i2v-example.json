@@ -1,7 +1,7 @@
 {
   "infinidream_algorithm": "wan-i2v",
   "prompt": "glamour shot: close-up of an attractive woman. she smiles and flirts with her body language and facial expressions. she makes eye contact with the camera and does her best to seduce with her eyes. background is black.",
-  "image": "./images/astronaut.png",
+  "image": "../images/astronaut.png",
   "size": "1280*720",
   "duration": 5,
   "num_inference_steps": 30,

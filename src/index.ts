@@ -77,7 +77,12 @@ createBullBoard({
 
 const app = express();
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+});
 const r2UploadService = new R2UploadService();
 
 app.use(express.json());

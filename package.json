@@ -29,7 +29,8 @@
     "form-data": "^4.0.4",
     "multer": "^2.0.2",
     "runpod-sdk": "^1.0.7",
-    "ts-toolbelt": "^9.6.0"
+    "ts-toolbelt": "^9.6.0",
+    "undici": "^7.16.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

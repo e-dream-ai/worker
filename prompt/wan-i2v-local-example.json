@@ -1,7 +1,7 @@
 {
   "infinidream_algorithm": "wan-i2v",
   "prompt": "cinematic shot: slow-tracking camera glides parallel to a giant white origami boat as it gently drifts down a jade-green river. Subtle ripples spread from the hull and shimmer with late-afternoon golden light; reflections of crisp paper folds dance on the glassy surface. Soft shafts of sunlight shift across the boat's creases while wisps of canyon mist curl in the background. A pair of tiny herons sweeps overhead, casting brief shadows on the water. Maintain shallow depth-of-field—foreground boat tack-sharp, distant foliage bokeh. Smooth, continuous motion, no cuts, seamless loop, 24 fps, ultra-detailed, no people, no text.",
-  "image": "./images/example_image.png",
+  "image": "../images/example_image.png",
   "size": "1280*720",
   "duration": 5,
   "num_inference_steps": 30,
