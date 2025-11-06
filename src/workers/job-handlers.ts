@@ -3,8 +3,10 @@ import { readFileSync } from 'fs';
 import { existsSync } from 'fs';
 import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
+import { R2UploadService } from '../services/r2-upload.service.js';
 
 const statusHandler = new StatusHandlerService();
+const r2UploadService = new R2UploadService();
 
 interface Wan22T2V720Params {
   prompt: string;
@@ -365,7 +367,7 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
   // Build input parameters
   const input: Record<string, unknown> = {
     prompt,
-    image: convertImageToBase64IfNeeded(image),
+    image: await processImageForEndpoint(image, String(job.id)),
     duration,
     num_inference_steps,
     guidance,
@@ -403,25 +405,35 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
   return statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
 }
 
-function convertImageToBase64IfNeeded(imagePath: string): string {
-  const isUrl = imagePath.startsWith('http://') || imagePath.startsWith('https://');
+async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
+  const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');
 
   if (isUrl) {
-    return imagePath;
+    return imageInput;
   }
 
-  if (!existsSync(imagePath)) {
-    throw new Error(`Image file not found: ${imagePath}`);
+  if (existsSync(imageInput)) {
+    try {
+      const presignedUrl = await r2UploadService.uploadImageToR2(imageInput, jobId);
+      return presignedUrl;
+    } catch (error: any) {
+      console.warn(`R2 upload failed for ${imageInput}, falling back to base64: ${error.message}`);
+      try {
+        const imageBuffer = readFileSync(imageInput);
+        return imageBuffer.toString('base64');
+      } catch (readError: any) {
+        throw new Error(`Failed to process image file ${imageInput}: ${readError.message}`);
+      }
+    }
   }
 
   try {
-    const imageBuffer = readFileSync(imagePath);
-    return imageBuffer.toString('base64');
-  } catch (error: any) {
-    throw new Error(`Failed to read image file ${imagePath}: ${error.message}`);
+    Buffer.from(imageInput, 'base64');
+    return imageInput;
+  } catch {
+    throw new Error(`Image input "${imageInput}" is not a valid URL, existing file path, or base64 string`);
   }
 }
-
 export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const {
     prompt,
@@ -454,14 +466,14 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
     if (typeof image !== 'string') {
       throw new Error('image must be a string URL or local file path');
     }
-    input.image = convertImageToBase64IfNeeded(image);
+    input.image = await processImageForEndpoint(image, String(job.id));
   }
 
   if (last_image) {
     if (typeof last_image !== 'string') {
       throw new Error('last_image must be a string URL or local file path');
     }
-    input.last_image = convertImageToBase64IfNeeded(last_image);
+    input.last_image = await processImageForEndpoint(last_image, String(job.id));
   }
 
   if (loras && Array.isArray(loras)) {
