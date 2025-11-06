@@ -407,9 +407,8 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
 
 async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
   const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');
-  const isDataUrl = imageInput.startsWith('data:image/');
 
-  if (isUrl || isDataUrl) {
+  if (isUrl) {
     return imageInput;
   }
 
@@ -432,7 +431,7 @@ async function processImageForEndpoint(imageInput: string, jobId: string): Promi
     Buffer.from(imageInput, 'base64');
     return imageInput;
   } catch {
-    throw new Error(`Image input "${imageInput}" is not a valid URL, data URL, existing file path, or base64 string`);
+    throw new Error(`Image input "${imageInput}" is not a valid URL, existing file path, or base64 string`);
   }
 }
 export async function handleWanI2VLoraJob(job: Job): Promise<any> {
