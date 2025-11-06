@@ -305,8 +305,10 @@ export class CLIService {
       }
 
       if (!existsSync(resolvedPath)) {
-        console.warn(`${field} path "${imagePath}" not found, skipping upload`);
-        continue;
+        throw new Error(
+          `Image file not found: "${imagePath}" (resolved: ${resolvedPath}). ` +
+            `Please ensure the image file exists locally before submitting the job.`
+        );
       }
 
       try {
