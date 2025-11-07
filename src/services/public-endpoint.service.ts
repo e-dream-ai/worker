@@ -31,55 +31,117 @@ export class PublicEndpointService {
   }
 
   async run(input: RunJobInput): Promise<{ id: string }> {
-    const response = await fetch(`${this.baseUrl}/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({ input }),
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ input }),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to start job: ${response.status} ${response.statusText}. ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        const error = new Error(`Failed to start job: ${response.status} ${response.statusText}. ${errorText}`);
+        console.error('[PublicEndpointService.run]', {
+          endpoint: this.baseUrl,
+          status: response.status,
+          statusText: response.statusText,
+          errorText,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      const data = (await response.json()) as PublicEndpointResponse;
+      return { id: data.id };
+    } catch (error: any) {
+      if (error.message?.includes('Failed to start job')) {
+        throw error;
+      }
+      console.error('[PublicEndpointService.run]', {
+        endpoint: this.baseUrl,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
     }
-
-    const data = (await response.json()) as PublicEndpointResponse;
-    return { id: data.id };
   }
 
   async runSync(input: RunJobInput): Promise<PublicEndpointResponse> {
-    const response = await fetch(`${this.baseUrl}/runsync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({ input }),
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/runsync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ input }),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to run sync job: ${response.status} ${response.statusText}. ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        const error = new Error(`Failed to run sync job: ${response.status} ${response.statusText}. ${errorText}`);
+        console.error('[PublicEndpointService.runSync]', {
+          endpoint: this.baseUrl,
+          status: response.status,
+          statusText: response.statusText,
+          errorText,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      return (await response.json()) as PublicEndpointResponse;
+    } catch (error: any) {
+      if (error.message?.includes('Failed to run sync job')) {
+        throw error;
+      }
+      console.error('[PublicEndpointService.runSync]', {
+        endpoint: this.baseUrl,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
     }
-
-    return (await response.json()) as PublicEndpointResponse;
   }
 
   async status(jobId: string): Promise<PublicEndpointResponse> {
-    const response = await fetch(`${this.baseUrl}/status/${jobId}`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/status/${jobId}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to get job status: ${response.status} ${response.statusText}. ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        const error = new Error(`Failed to get job status: ${response.status} ${response.statusText}. ${errorText}`);
+        console.error('[PublicEndpointService.status]', {
+          endpoint: this.baseUrl,
+          jobId,
+          status: response.status,
+          statusText: response.statusText,
+          errorText,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      return (await response.json()) as PublicEndpointResponse;
+    } catch (error: any) {
+      if (error.message?.includes('Failed to get job status')) {
+        throw error;
+      }
+      console.error('[PublicEndpointService.status]', {
+        endpoint: this.baseUrl,
+        jobId,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
     }
-
-    return (await response.json()) as PublicEndpointResponse;
   }
 }
