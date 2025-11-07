@@ -35,35 +35,77 @@ export class R2UploadService {
 
   async downloadAndUploadVideo(videoUrl: string, jobId: string, filename?: string): Promise<string> {
     if (!this.s3Client) {
-      throw new Error(
+      const error = new Error(
         'R2 is not configured. Please set R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.'
       );
+      console.error('[R2UploadService.downloadAndUploadVideo]', {
+        jobId,
+        videoUrl,
+        filename,
+        error: error.message,
+      });
+      throw error;
     }
 
-    const { stream, contentLength } = await this.fetchVideoStream(videoUrl);
-    const objectKey = await this.uploadStreamToR2(stream, jobId, filename, contentLength);
-    const presignedUrl = await this.generatePresignedUrl(objectKey);
+    try {
+      const { stream, contentLength } = await this.fetchVideoStream(videoUrl);
+      const objectKey = await this.uploadStreamToR2(stream, jobId, filename, contentLength);
+      const presignedUrl = await this.generatePresignedUrl(objectKey);
 
-    return presignedUrl;
+      return presignedUrl;
+    } catch (error: any) {
+      console.error('[R2UploadService.downloadAndUploadVideo]', {
+        jobId,
+        videoUrl,
+        filename,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
   private async fetchVideoStream(url: string): Promise<{ stream: Readable; contentLength?: number }> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        const error = new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
+        console.error('[R2UploadService.fetchVideoStream]', {
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      if (!response.body) {
+        const error = new Error('Response body is null');
+        console.error('[R2UploadService.fetchVideoStream]', {
+          url,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      const contentLength = response.headers.get('content-length');
+      const stream = Readable.fromWeb(response.body as ReadableStream);
+
+      return {
+        stream,
+        contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
+      };
+    } catch (error: any) {
+      if (error.message?.includes('Failed to fetch video') || error.message?.includes('Response body is null')) {
+        throw error;
+      }
+      console.error('[R2UploadService.fetchVideoStream]', {
+        url,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
     }
-
-    if (!response.body) {
-      throw new Error('Response body is null');
-    }
-
-    const contentLength = response.headers.get('content-length');
-    const stream = Readable.fromWeb(response.body as ReadableStream);
-
-    return {
-      stream,
-      contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
-    };
   }
 
   private async uploadStreamToR2(
@@ -73,88 +115,150 @@ export class R2UploadService {
     contentLength?: number
   ): Promise<string> {
     if (!this.s3Client) {
-      throw new Error('S3 client not initialized');
+      const error = new Error('S3 client not initialized');
+      console.error('[R2UploadService.uploadStreamToR2]', {
+        jobId,
+        filename,
+        error: error.message,
+      });
+      throw error;
     }
 
-    // Determine object key
-    const fileExtension = '.mp4';
-    const objectKey = filename
-      ? `${this.uploadDirectory}/${filename}`
-      : `${this.uploadDirectory}/${jobId}-${Date.now()}${fileExtension}`;
+    try {
+      // Determine object key
+      const fileExtension = '.mp4';
+      const objectKey = filename
+        ? `${this.uploadDirectory}/${filename}`
+        : `${this.uploadDirectory}/${jobId}-${Date.now()}${fileExtension}`;
 
-    const commandParams: any = {
-      Bucket: this.bucketName,
-      Key: objectKey,
-      Body: stream,
-      ContentType: 'video/mp4',
-    };
+      const commandParams: any = {
+        Bucket: this.bucketName,
+        Key: objectKey,
+        Body: stream,
+        ContentType: 'video/mp4',
+      };
 
-    if (contentLength !== undefined && contentLength > 0 && !isNaN(contentLength)) {
-      commandParams.ContentLength = contentLength;
+      if (contentLength !== undefined && contentLength > 0 && !isNaN(contentLength)) {
+        commandParams.ContentLength = contentLength;
+      }
+
+      const command = new PutObjectCommand(commandParams);
+
+      await this.s3Client.send(command);
+      return objectKey;
+    } catch (error: any) {
+      console.error('[R2UploadService.uploadStreamToR2]', {
+        jobId,
+        filename,
+        bucketName: this.bucketName,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
     }
-
-    const command = new PutObjectCommand(commandParams);
-
-    await this.s3Client.send(command);
-    return objectKey;
   }
 
   async uploadImageToR2(imagePath: string, jobId: string, filename?: string): Promise<string> {
     if (!this.s3Client) {
-      throw new Error(
+      const error = new Error(
         'R2 is not configured. Please set R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.'
       );
+      console.error('[R2UploadService.uploadImageToR2]', {
+        jobId,
+        imagePath,
+        filename,
+        error: error.message,
+      });
+      throw error;
     }
 
     if (!existsSync(imagePath)) {
-      throw new Error(`Image file not found: ${imagePath}`);
+      const error = new Error(`Image file not found: ${imagePath}`);
+      console.error('[R2UploadService.uploadImageToR2]', {
+        jobId,
+        imagePath,
+        filename,
+        error: error.message,
+      });
+      throw error;
     }
 
-    const imageBuffer = readFileSync(imagePath);
-    const fileExtension = extname(imagePath).toLowerCase();
-    const contentType = this.getMimeTypeFromExtension(fileExtension);
+    try {
+      const imageBuffer = readFileSync(imagePath);
+      const fileExtension = extname(imagePath).toLowerCase();
+      const contentType = this.getMimeTypeFromExtension(fileExtension);
 
-    const objectKey = filename
-      ? `${this.imageDirectory}/${filename}`
-      : `${this.imageDirectory}/${jobId}-${Date.now()}${fileExtension}`;
+      const objectKey = filename
+        ? `${this.imageDirectory}/${filename}`
+        : `${this.imageDirectory}/${jobId}-${Date.now()}${fileExtension}`;
 
-    // Upload to R2
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: objectKey,
-      Body: imageBuffer,
-      ContentType: contentType,
-    });
+      // Upload to R2
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: objectKey,
+        Body: imageBuffer,
+        ContentType: contentType,
+      });
 
-    await this.s3Client.send(command);
+      await this.s3Client.send(command);
 
-    return await this.generatePresignedUrl(objectKey);
+      return await this.generatePresignedUrl(objectKey);
+    } catch (error: any) {
+      console.error('[R2UploadService.uploadImageToR2]', {
+        jobId,
+        imagePath,
+        filename,
+        bucketName: this.bucketName,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
   async uploadImageBufferToR2(imageBuffer: Buffer, jobId: string, filename?: string): Promise<string> {
     if (!this.s3Client) {
-      throw new Error(
+      const error = new Error(
         'R2 is not configured. Please set R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.'
       );
+      console.error('[R2UploadService.uploadImageBufferToR2]', {
+        jobId,
+        filename,
+        bufferSize: imageBuffer.length,
+        error: error.message,
+      });
+      throw error;
     }
 
-    const fileExtension = filename ? extname(filename).toLowerCase() : '.png';
-    const contentType = this.getMimeTypeFromExtension(fileExtension);
+    try {
+      const fileExtension = filename ? extname(filename).toLowerCase() : '.png';
+      const contentType = this.getMimeTypeFromExtension(fileExtension);
 
-    const objectKey = filename
-      ? `${this.imageDirectory}/${filename}`
-      : `${this.imageDirectory}/${jobId}-${Date.now()}${fileExtension}`;
+      const objectKey = filename
+        ? `${this.imageDirectory}/${filename}`
+        : `${this.imageDirectory}/${jobId}-${Date.now()}${fileExtension}`;
 
-    const command = new PutObjectCommand({
-      Bucket: this.bucketName,
-      Key: objectKey,
-      Body: imageBuffer,
-      ContentType: contentType,
-    });
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: objectKey,
+        Body: imageBuffer,
+        ContentType: contentType,
+      });
 
-    await this.s3Client.send(command);
+      await this.s3Client.send(command);
 
-    return await this.generatePresignedUrl(objectKey);
+      return await this.generatePresignedUrl(objectKey);
+    } catch (error: any) {
+      console.error('[R2UploadService.uploadImageBufferToR2]', {
+        jobId,
+        filename,
+        bufferSize: imageBuffer.length,
+        bucketName: this.bucketName,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
   private getMimeTypeFromExtension(extension: string): string {
@@ -172,14 +276,29 @@ export class R2UploadService {
 
   private async generatePresignedUrl(objectKey: string): Promise<string> {
     if (!this.s3Client) {
-      throw new Error('S3 client not initialized');
+      const error = new Error('S3 client not initialized');
+      console.error('[R2UploadService.generatePresignedUrl]', {
+        objectKey,
+        error: error.message,
+      });
+      throw error;
     }
 
-    const command = new GetObjectCommand({
-      Bucket: this.bucketName,
-      Key: objectKey,
-    });
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: objectKey,
+      });
 
-    return await getSignedUrl(this.s3Client, command, { expiresIn: this.presignedExpiry });
+      return await getSignedUrl(this.s3Client, command, { expiresIn: this.presignedExpiry });
+    } catch (error: any) {
+      console.error('[R2UploadService.generatePresignedUrl]', {
+        objectKey,
+        bucketName: this.bucketName,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 }

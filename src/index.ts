@@ -100,6 +100,10 @@ app.use('/admin/queues', serverAdapter.getRouter());
 app.post('/api/upload-image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
+      console.error('[POST /api/upload-image]', {
+        error: 'No image file provided',
+        hasFile: !!req.file,
+      });
       res.status(400).json({ error: 'No image file provided' });
       return;
     }
@@ -112,7 +116,12 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
 
     res.json({ url: presignedUrl });
   } catch (error: any) {
-    console.error('Error uploading image:', error);
+    console.error('[POST /api/upload-image]', {
+      error: error.message || 'Unknown error',
+      stack: error.stack,
+      filename: req.file?.originalname,
+      fileSize: req.file?.size,
+    });
     res.status(500).json({ error: error.message || 'Failed to upload image' });
   }
 });
