@@ -46,7 +46,7 @@ export class CLIService {
     const queueName = this.inferQueueName(jsonData);
 
     if (queueName === 'wani2v' || queueName === 'wani2vlora') {
-      jsonData = await this.processImagesForWanI2V(jsonData, filePath);
+      jsonData = await this.processImagesForWanI2V(jsonData);
     }
 
     const jobOptions = this.createJobOptions(filePath, options);
@@ -272,10 +272,10 @@ export class CLIService {
     return data.url;
   }
 
-  private async processImagesForWanI2V(jsonData: any, filePath: string): Promise<any> {
+  private async processImagesForWanI2V(jsonData: any): Promise<any> {
     const result = { ...jsonData };
     const imageFields = ['image', 'last_image'];
-    const baseDir = path.dirname(path.resolve(filePath));
+    const baseDir = process.cwd();
     const workerUrl = env.WORKER_URL;
 
     for (const field of imageFields) {
