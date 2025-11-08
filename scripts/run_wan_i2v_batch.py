@@ -4,7 +4,6 @@ import subprocess
 import sys
 import time
 import tempfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 from dotenv import load_dotenv
@@ -246,55 +245,37 @@ def main():
     print("Queueing jobs to Redis...")
     print("="*60)
     
-    def queue_single_job(args: Tuple[int, int, Path, str]) -> Tuple[int, bool, str, Optional[str]]:
-        """Queue a single job and return (job_number, success, message, job_id)."""
-        job_count, image_idx, image_path_obj, combo = args
-        combo_idx = combos.index(combo) + 1
-        
-        try:
-            job_json = create_job_json(job_config, image_path_obj, combo, worker_dir)
-        except Exception as e:
-            return (job_count, False, f"Error creating job JSON: {e}", None)
-        
-        try:
-            result, job_id = queue_job_via_cli(job_json, worker_dir)
-            if result.returncode == 0:
-                return (job_count, True, f"{image_path_obj.name} + combo {combo_idx}", job_id)
-            else:
-                error_msg = result.stderr.strip() if hasattr(result, 'stderr') and result.stderr else "Unknown error"
-                return (job_count, False, f"Return code {result.returncode}: {error_msg}", None)
-        except Exception as e:
-            return (job_count, False, f"Error: {e}", None)
-    
-    job_args = []
-    job_count = 0
-    for image_idx, image_path_obj in enumerate(images, 1):
-        for combo in combos:
-            job_count += 1
-            job_args.append((job_count, image_idx, image_path_obj, combo))
-    
     successful_jobs = 0
     failed_jobs = 0
     job_ids = []
     
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_job = {executor.submit(queue_single_job, args): args[0] for args in job_args}
-        
-        for future in as_completed(future_to_job):
-            job_num = future_to_job[future]
+    job_count = 0
+    for image_idx, image_path_obj in enumerate(images, 1):
+        for combo in combos:
+            job_count += 1
+            combo_idx = combos.index(combo) + 1
+            
             try:
-                job_num_result, success, message, job_id = future.result()
-                
-                if success:
-                    print(f"[{job_num_result}/{total_jobs}] {message}")
+                job_json = create_job_json(job_config, image_path_obj, combo, worker_dir)
+            except Exception as e:
+                print(f"[{job_count}/{total_jobs}] Failed: Error creating job JSON: {e}", file=sys.stderr)
+                failed_jobs += 1
+                continue
+            
+            try:
+                result, job_id = queue_job_via_cli(job_json, worker_dir)
+                if result.returncode == 0:
+                    message = f"{image_path_obj.name} + combo {combo_idx}"
+                    print(f"[{job_count}/{total_jobs}] {message}")
                     successful_jobs += 1
                     if job_id:
                         job_ids.append(job_id)
                 else:
-                    print(f"[{job_num_result}/{total_jobs}] Failed: {message}", file=sys.stderr)
+                    error_msg = result.stderr.strip() if hasattr(result, 'stderr') and result.stderr else "Unknown error"
+                    print(f"[{job_count}/{total_jobs}] Failed: Return code {result.returncode}: {error_msg}", file=sys.stderr)
                     failed_jobs += 1
             except Exception as e:
-                print(f"[{job_num}/{total_jobs}] Exception: {e}", file=sys.stderr)
+                print(f"[{job_count}/{total_jobs}] Failed: Error: {e}", file=sys.stderr)
                 failed_jobs += 1
     
     print("\n" + "="*60)
