@@ -75,6 +75,67 @@ How it works
 - The worker returns `{ r2_url: <presigned-url> }`.
 - The local CLI downloads from the provided URL to your specified `-o` path (or the default path when `-o` is omitted).
 
+### C) Batch Processing with Python Script
+
+The `run_wan_i2v_batch.py` script allows you to queue multiple `wan-i2v` jobs at once, combining a main prompt with multiple "combo" prompts for each image in a directory.
+
+**Prerequisites:**
+
+1. Install Python dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Build TypeScript (if not already built):
+
+   ```bash
+   npm run build
+   ```
+
+3. Ensure Redis is running and accessible (same Redis instance as the worker)
+
+**Setup:**
+
+1. Configure `scripts/job.json`:
+
+   ```json
+   {
+     "prompt": "Your main prompt here",
+     "image_path": "scripts/images",
+     "size": "1280*720",
+     "duration": 5,
+     "num_inference_steps": 30,
+     "guidance": 5,
+     "seed": 193078717,
+     "combos": ["First combo prompt variation", "Second combo prompt variation"],
+     "playlist": {
+       "name": "My Batch Playlist",
+       "description": "Optional description",
+       "nsfw": false
+     }
+   }
+   ```
+
+2. Place images in the directory specified by `image_path` (e.g., `scripts/images/`)
+
+**Running the script:**
+
+```bash
+cd scripts
+python3 run_wan_i2v_batch.py
+```
+
+**Environment Variables:**
+
+- `REDIS_HOST` (default: `localhost`) or `REDISCLOUD_URL`
+- `REDIS_PORT` (default: `6379`)
+- `REDIS_PASSWORD` (optional, empty string if none)
+- `BACKEND_URL` - API backend URL
+- `API_KEY` - API key for authentication
+
+If `BACKEND_URL` and `API_KEY` are not set, the script will queue jobs but skip playlist creation.
+
 ## Ops
 
 1. Visit https://www.runpod.io/console/serverless/user/endpoint/89vs9h0qx0g966?tab=requests to see recent activity and cancel jobs you don't wish to keep running.
