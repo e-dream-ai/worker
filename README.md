@@ -99,6 +99,8 @@ The `run_wan_i2v_batch.py` script allows you to queue multiple `wan-i2v` jobs at
 
 1. Configure `scripts/job.json`:
 
+   **Option A: Create a new playlist**
+
    ```json
    {
      "prompt": "Your main prompt here",
@@ -116,6 +118,28 @@ The `run_wan_i2v_batch.py` script allows you to queue multiple `wan-i2v` jobs at
      }
    }
    ```
+
+   **Option B: Use an existing playlist (skips duplicate dreams)**
+
+   ```json
+   {
+     "prompt": "Your main prompt here",
+     "image_path": "scripts/images",
+     "playlist_uuid": "your-existing-playlist-uuid-here",
+     "size": "1280*720",
+     "duration": 5,
+     "num_inference_steps": 30,
+     "guidance": 5,
+     "seed": 193078717,
+     "combos": ["First combo prompt variation", "Second combo prompt variation"]
+   }
+   ```
+
+   When using `playlist_uuid`, the script will:
+
+   - Use the existing playlist instead of creating a new one
+   - Check for existing dreams in the playlist
+   - Skip jobs that would create duplicate dreams (same image + combo combination)
 
 2. Place images in the directory specified by `image_path` (e.g., `scripts/images/`)
 

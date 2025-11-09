@@ -4,8 +4,9 @@ import subprocess
 import sys
 import time
 import tempfile
+import hashlib
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, Set
 from dotenv import load_dotenv
 
 worker_dir = Path(__file__).parent.parent
@@ -47,6 +48,13 @@ def get_images_from_path(image_path: str, base_dir: Path) -> List[Path]:
     return sorted(images)
 
 
+def create_job_identifier(image_path: Path, combo_prompt: str) -> str:
+    """Create a unique identifier for an image+combo combination."""
+    image_name = image_path.name
+    combo_hash = hashlib.md5(combo_prompt.encode()).hexdigest()[:8]
+    return f"{image_name}:{combo_hash}"
+
+
 def create_job_json(
     base_config: Dict[str, Any],
     image_path: Path,
@@ -82,6 +90,33 @@ def create_job_json(
             job_json[param] = base_config[param]
     
     return job_json
+
+
+def get_existing_dream_identifiers(playlist_uuid: str, client) -> Set[str]:
+    """Get set of existing dream identifiers from a playlist."""
+    existing_identifiers = set()
+    
+    try:
+        playlist = client.get_playlist(playlist_uuid, auto_populate=True)
+        items = playlist.get("items", [])
+        
+        for item in items:
+            if item.get("type") == "dream" and item.get("dreamItem"):
+                dream = item["dreamItem"]
+                description = dream.get("description", "")
+                name = dream.get("name", "")
+                
+                text_to_check = f"{description} {name}"
+                if "BATCH_IDENTIFIER:" in text_to_check:
+                    parts = text_to_check.split("BATCH_IDENTIFIER:")
+                    if len(parts) > 1:
+                        identifier = parts[1].split()[0] if parts[1].split() else ""
+                        if identifier:
+                            existing_identifiers.add(identifier)
+    except Exception as e:
+        print(f"Warning: Error getting existing dreams from playlist: {e}", file=sys.stderr)
+    
+    return existing_identifiers
 
 
 def get_job_result_from_redis(job_id: str, queue_name: str = "wani2v") -> Optional[Dict[str, Any]]:
@@ -241,12 +276,54 @@ def main():
     total_jobs = len(images) * len(combos)
     print(f"\nTotal jobs to run: {total_jobs} ({len(images)} images × {len(combos)} combos)")
     
+    playlist_uuid = job_config.get("playlist_uuid")
+    existing_identifiers: Set[str] = set()
+    playlist = None
+    
+    if playlist_uuid:
+        print("\n" + "="*60)
+        print("Checking for existing playlist...")
+        print("="*60)
+        print(f"Playlist UUID: {playlist_uuid}")
+        
+        try:
+            from edream_sdk.client import create_edream_client
+            
+            backend_url = os.environ.get("BACKEND_URL")
+            api_key = os.environ.get("API_KEY")
+            
+            if not backend_url or not api_key:
+                print("\nWarning: Missing API credentials (BACKEND_URL, API_KEY)")
+                print("Cannot check for existing playlist. Will proceed without duplicate checking.")
+            else:
+                client = create_edream_client(backend_url, api_key)
+                try:
+                    playlist = client.get_playlist(playlist_uuid, auto_populate=True)
+                    print(f"Playlist found: {playlist.get('name', 'Unnamed')}")
+                    existing_identifiers = get_existing_dream_identifiers(playlist_uuid, client)
+                    print(f"Found {len(existing_identifiers)} existing dream(s) in playlist")
+                    if existing_identifiers:
+                        print("Existing identifiers:")
+                        for ident in sorted(existing_identifiers)[:10]:
+                            print(f"  - {ident}")
+                        if len(existing_identifiers) > 10:
+                            print(f"  ... and {len(existing_identifiers) - 10} more")
+                except Exception as e:
+                    print(f"Error: Playlist not found or inaccessible: {e}", file=sys.stderr)
+                    print("Will create new playlist if needed.")
+                    playlist_uuid = None
+        except ImportError:
+            print("\nWarning: edream_sdk not installed. Cannot check for existing playlist.")
+            print("Install it with: pip install -r requirements.txt")
+            playlist_uuid = None
+    
     print("\n" + "="*60)
     print("Queueing jobs to Redis...")
     print("="*60)
     
     successful_jobs = 0
     failed_jobs = 0
+    skipped_jobs = 0
     job_ids = []
     
     job_count = 0
@@ -254,6 +331,12 @@ def main():
         for combo in combos:
             job_count += 1
             combo_idx = combos.index(combo) + 1
+            
+            job_identifier = create_job_identifier(image_path_obj, combo)
+            if job_identifier in existing_identifiers:
+                print(f"[{job_count}/{total_jobs}] Skipped (already exists): {image_path_obj.name} + combo {combo_idx}")
+                skipped_jobs += 1
+                continue
             
             try:
                 job_json = create_job_json(job_config, image_path_obj, combo, worker_dir)
@@ -269,7 +352,8 @@ def main():
                     print(f"[{job_count}/{total_jobs}] {message}")
                     successful_jobs += 1
                     if job_id:
-                        job_ids.append(job_id)
+                        image_name_without_ext = image_path_obj.stem
+                        job_ids.append((job_id, job_identifier, image_name_without_ext, combo_idx, image_path_obj))
                 else:
                     error_msg = result.stderr.strip() if hasattr(result, 'stderr') and result.stderr else "Unknown error"
                     print(f"[{job_count}/{total_jobs}] Failed: Return code {result.returncode}: {error_msg}", file=sys.stderr)
@@ -283,18 +367,15 @@ def main():
     print("="*60)
     print(f"Total jobs: {total_jobs}")
     print(f"Successfully queued: {successful_jobs}")
+    print(f"Skipped (already exist): {skipped_jobs}")
     print(f"Failed to queue: {failed_jobs}")
     print(f"Jobs to track: {len(job_ids)}")
     
     playlist_config = job_config.get("playlist")
-    if playlist_config and job_ids:
+    if (playlist_config or playlist_uuid) and job_ids:
         print("\n" + "="*60)
         print("Playlist Configuration")
         print("="*60)
-        print(f"Playlist name: {playlist_config.get('name', 'Unnamed')}")
-        if playlist_config.get('description'):
-            print(f"Description: {playlist_config.get('description')}")
-        print(f"NSFW: {playlist_config.get('nsfw', False)}")
         
         try:
             from edream_sdk.client import create_edream_client
@@ -315,15 +396,41 @@ def main():
                 print(f"  Backend: {backend_url}")
                 
                 client = create_edream_client(backend_url, api_key)
-                playlist_data: CreatePlaylistRequest = {
-                    "name": playlist_config.get("name", "Unnamed Playlist"),
-                    "description": playlist_config.get("description"),
-                    "nsfw": playlist_config.get("nsfw", False),
-                }
                 
-                print(f"\nCreating playlist: {playlist_data['name']}...")
-                playlist = client.create_playlist(playlist_data)
-                print(f"Playlist created: {playlist['uuid']}")
+                if playlist_uuid:
+                    if not playlist:
+                        try:
+                            playlist = client.get_playlist(playlist_uuid, auto_populate=True)
+                        except Exception as e:
+                            print(f"\nError: Could not retrieve playlist {playlist_uuid}: {e}", file=sys.stderr)
+                            print("Cannot proceed without valid playlist.")
+                            sys.exit(1)
+                    
+                    print(f"\nUsing existing playlist: {playlist.get('name', 'Unnamed')}")
+                    print(f"Playlist UUID: {playlist['uuid']}")
+                    if playlist_config:
+                        print(f"Config name: {playlist_config.get('name', 'Unnamed')}")
+                        if playlist_config.get('description'):
+                            print(f"Config description: {playlist_config.get('description')}")
+                        print(f"Config NSFW: {playlist_config.get('nsfw', False)}")
+                else:
+                    if not playlist_config:
+                        print("\nError: No playlist configuration found and no existing playlist UUID provided.")
+                        print("Either provide 'playlist_uuid' or 'playlist' configuration in job.json")
+                        sys.exit(1)
+                    else:
+                        playlist_data: CreatePlaylistRequest = {
+                            "name": playlist_config.get("name", "Unnamed Playlist"),
+                            "description": playlist_config.get("description"),
+                            "nsfw": playlist_config.get("nsfw", False),
+                        }
+                        
+                        print(f"\nCreating playlist: {playlist_data['name']}...")
+                        if playlist_config.get('description'):
+                            print(f"Description: {playlist_config.get('description')}")
+                        print(f"NSFW: {playlist_config.get('nsfw', False)}")
+                        playlist = client.create_playlist(playlist_data)
+                        print(f"Playlist created: {playlist['uuid']}")
                 
                 print(f"\nWaiting for {len(job_ids)} jobs to complete...")
                 print("(Videos will be uploaded as they complete)")
@@ -338,7 +445,7 @@ def main():
                 try:
                     while job_ids and (time.time() - start_time) < max_wait_time:
                         remaining_jobs = []
-                        for job_id in job_ids:
+                        for job_id, job_identifier, image_name, combo_idx, image_path in job_ids:
                             if job_id in processed_jobs:
                                 continue
                                 
@@ -353,20 +460,72 @@ def main():
                                     
                                     if client.download_file(r2_url, str(temp_file)):
                                         print(f"  Downloaded, creating dream and adding to playlist...")
-                                        dream = client.add_file_to_playlist(playlist["uuid"], str(temp_file))
-                                        print(f"  Added to playlist (dream: {dream['uuid']})")
+                                        dream_name = f"{image_name}_combo-{combo_idx}"
+                                        dream = client.add_file_to_playlist(playlist["uuid"], str(temp_file), name=dream_name)
+                                        
+                                        if not dream:
+                                            raise Exception("add_file_to_playlist returned None")
+                                        if "uuid" not in dream:
+                                            raise Exception(f"Dream object missing uuid: {dream}")
+                                        
+                                        keyframe_uuid = None
+                                        try:
+                                            print(f"  Creating keyframe for dream: {dream_name}...")
+                                            keyframe = client._create_keyframe(
+                                                name=dream_name,
+                                                file_path=str(image_path)
+                                            )
+                                            keyframe_uuid = keyframe["uuid"]
+                                            print(f"  Keyframe created: {keyframe['uuid']}")
+                                            
+                                            print(f"  Adding keyframe to playlist...")
+                                            client._add_keyframe_to_playlist(
+                                                playlist["uuid"],
+                                                keyframe_uuid
+                                            )
+                                            print(f"  Keyframe added to playlist")
+                                        except Exception as e:
+                                            print(f"  Warning: Could not create/add keyframe: {e}")
+                                        
+                                        try:
+                                            current_desc = dream.get("description") or ""
+                                            identifier_text = f"BATCH_IDENTIFIER:{job_identifier}"
+                                            if identifier_text not in current_desc:
+                                                new_desc = f"{current_desc} {identifier_text}".strip()
+                                            else:
+                                                new_desc = current_desc
+                                            
+                                            update_data = {
+                                                "description": new_desc
+                                            }
+                                            if keyframe_uuid:
+                                                update_data["startKeyframe"] = keyframe_uuid
+                                                update_data["endKeyframe"] = keyframe_uuid
+                                            
+                                            if update_data:
+                                                client.update_dream(dream["uuid"], update_data)
+                                        except Exception as e:
+                                            print(f"  Warning: Could not update dream: {e}")
+                                        
+                                        print(f"  Added to playlist (dream: {dream['uuid']}, name: {dream_name})")
                                         uploaded_count += 1
                                         processed_jobs.add(job_id)
                                         
                                         temp_file.unlink(missing_ok=True)
                                     else:
                                         print(f"  Failed to download, will retry...")
-                                        remaining_jobs.append(job_id)
+                                        remaining_jobs.append((job_id, job_identifier, image_name, combo_idx, image_path))
                                 except Exception as e:
-                                    print(f"  Error processing job {job_id}: {e}", file=sys.stderr)
-                                    remaining_jobs.append(job_id)
+                                    import traceback
+                                    error_msg = str(e)
+                                    if isinstance(e, KeyError):
+                                        error_msg = f"KeyError: Missing key '{e}'. Full error: {type(e).__name__}: {e}"
+                                    print(f"  Error processing job {job_id}: {error_msg}", file=sys.stderr)
+                                    print(f"  Full traceback:", file=sys.stderr)
+                                    traceback.print_exc(file=sys.stderr)
+                                    remaining_jobs.append((job_id, job_identifier, image_name, combo_idx, image_path))
                             else:
-                                remaining_jobs.append(job_id)
+                                remaining_jobs.append((job_id, job_identifier, image_name, combo_idx, image_path))
                         
                         job_ids = remaining_jobs
                         
@@ -384,6 +543,47 @@ def main():
                     print(f"  Videos uploaded: {uploaded_count}")
                     if job_ids:
                         print(f"  Jobs not completed: {len(job_ids)}")
+                    
+                    if uploaded_count > 0:
+                        print(f"\nReordering playlist items by image name...")
+                        try:
+                            items_response = client.get_playlist_items(playlist["uuid"])
+                            all_items = items_response.get("items", [])
+                            
+                            dream_items = [
+                                item for item in all_items
+                                if item.get("type") == "dream" and item.get("dreamItem")
+                            ]
+                            
+                            def extract_sort_key(item):
+                                dream = item.get("dreamItem", {})
+                                name = dream.get("name", "")
+                                
+                                if "_combo-" in name:
+                                    parts = name.rsplit("_combo-", 1)
+                                    image_name = parts[0]
+                                    try:
+                                        combo_idx = int(parts[1])
+                                    except (ValueError, IndexError):
+                                        combo_idx = 0
+                                    return (image_name, combo_idx)
+                                else:
+                                    return (name, 0)
+                            
+                            dream_items.sort(key=extract_sort_key)
+                            
+                            order_array = [
+                                {"id": item["id"], "order": idx + 1}
+                                for idx, item in enumerate(dream_items)
+                            ]
+                            
+                            if order_array:
+                                client.reorder_playlist(playlist["uuid"], order_array)
+                                print(f"  Reordered {len(order_array)} dream(s)")
+                            else:
+                                print(f"  No dreams found to reorder")
+                        except Exception as e:
+                            print(f"  Warning: Could not reorder playlist: {e}")
                 finally:
                     import shutil
                     shutil.rmtree(temp_dir, ignore_errors=True)
