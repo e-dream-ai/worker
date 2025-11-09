@@ -369,7 +369,7 @@ def main():
                 print(f"[{idx}/{total_jobs}] Queued: {dream_name}")
                 successful_jobs += 1
                 if job_id:
-                    job_mapping[job_id] = dream_uuid
+                    job_mapping[job_id] = {"dream_uuid": dream_uuid, "dream_name": dream_name}
             else:
                 error_msg = result.stderr.strip() if hasattr(result, 'stderr') and result.stderr else "Unknown error"
                 print(f"[{idx}/{total_jobs}] Failed: Return code {result.returncode}: {error_msg}", file=sys.stderr)
@@ -400,9 +400,12 @@ def main():
         try:
             while job_mapping and (time.time() - start_time) < max_wait_time:
                 remaining_jobs = {}
-                for job_id, dream_uuid in job_mapping.items():
+                for job_id, dream_info in job_mapping.items():
                     if job_id in processed_jobs:
                         continue
+                    
+                    dream_uuid = dream_info["dream_uuid"]
+                    dream_name = dream_info["dream_name"]
                     
                     result = get_job_result_from_redis(job_id, "uprezvideo")
                     if result and result.get("r2_url"):
@@ -416,7 +419,7 @@ def main():
                             
                             if client.download_file(r2_url, str(temp_file)):
                                 print(f"  Downloaded, creating dream and adding to playlist...")
-                                new_dream = client.add_file_to_playlist(output_playlist_uuid, str(temp_file))
+                                new_dream = client.add_file_to_playlist(output_playlist_uuid, str(temp_file), name=dream_name)
                                 print(f"  Added to playlist (dream: {new_dream['uuid']})")
                                 
                                 print(f"  Marking original dream as uprezed...")
@@ -431,14 +434,14 @@ def main():
                                 temp_file.unlink(missing_ok=True)
                             else:
                                 print(f"  Failed to download, will retry...")
-                                remaining_jobs[job_id] = dream_uuid
+                                remaining_jobs[job_id] = dream_info
                         except Exception as e:
                             print(f"  Error processing job {job_id}: {e}", file=sys.stderr)
                             import traceback
                             traceback.print_exc()
-                            remaining_jobs[job_id] = dream_uuid
+                            remaining_jobs[job_id] = dream_info
                     else:
-                        remaining_jobs[job_id] = dream_uuid
+                        remaining_jobs[job_id] = dream_info
                 
                 job_mapping = remaining_jobs
                 
