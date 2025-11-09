@@ -2,7 +2,7 @@
   "infinidream_algorithm": "deforum",
   "0": "a fish on a bicycle",
   "width": 1024,
-  "height": 768,
-  "max_frames": 609,
+  "height": 576,
+  "max_frames": 600,
   "fps": 16
 }

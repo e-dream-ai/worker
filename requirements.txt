@@ -1,0 +1,6 @@
+-e git+https://github.com/e-dream-ai/python-api.git@main#egg=edream_sdk
+bullmq
+redis>=5.0.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+msgpack>=1.0.0

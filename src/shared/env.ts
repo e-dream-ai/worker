@@ -20,6 +20,19 @@ export const env = cleanEnv(process.env, {
   RUNPOD_DEFORUM_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_UPREZ_ENDPOINT_ID: str({ default: '' }),
 
+  /**
+   * CLOUDFLARE R2
+   */
+  R2_BUCKET_NAME: str({ default: '' }),
+  R2_ENDPOINT_URL: str({ default: '' }),
+  R2_ACCESS_KEY_ID: str({ default: '' }),
+  R2_SECRET_ACCESS_KEY: str({ default: '' }),
+  R2_UPLOAD_DIRECTORY: str({ default: 'video-outputs' }),
+  R2_IMAGE_DIRECTORY: str({ default: 'image-inputs' }),
+  R2_PRESIGNED_EXPIRY: str({ default: '86400' }),
+
+  WORKER_URL: str({ default: 'http://localhost:3000' }),
+
   ADMIN_PASS: str({ default: '' }),
 });
 
