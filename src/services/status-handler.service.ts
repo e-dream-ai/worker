@@ -1,4 +1,6 @@
 import { Job } from 'bullmq';
+import { PublicEndpointService, PublicEndpointResponse } from './public-endpoint.service.js';
+import { R2UploadService } from './r2-upload.service.js';
 
 interface RunpodStatus {
   status: string;
@@ -7,12 +9,18 @@ interface RunpodStatus {
     message?: string;
     video?: string;
     download_url?: string;
+    video_url?: string;
     requires_auth?: boolean;
   };
+  error?: string;
 }
 
 export class StatusHandlerService {
-  constructor(private readonly defaultPollIntervalMs: number = 1000) {}
+  private readonly r2UploadService: R2UploadService;
+
+  constructor(private readonly defaultPollIntervalMs: number = 1000) {
+    this.r2UploadService = new R2UploadService();
+  }
 
   async handleStatus(endpoint: any, runpodId: string, job: Job, pollIntervalMs?: number): Promise<any> {
     const finalStatus = await this.pollForCompletion(
@@ -36,12 +44,33 @@ export class StatusHandlerService {
     job: Job,
     pollIntervalMs: number
   ): Promise<RunpodStatus> {
+    const isPublicEndpoint = endpoint instanceof PublicEndpointService;
     let status: RunpodStatus | undefined;
     let lastLogMessage = '';
 
     do {
       try {
-        status = await endpoint.status(runpodId);
+        const rawStatus = await endpoint.status(runpodId);
+
+        if (isPublicEndpoint) {
+          const publicStatus = rawStatus as PublicEndpointResponse;
+          const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
+          status = {
+            status: publicStatus.status,
+            completed: publicStatus.status === 'COMPLETED',
+            output: publicStatus.output
+              ? {
+                  video_url: videoUrl,
+                  result: publicStatus.output.result,
+                  ...publicStatus.output,
+                }
+              : undefined,
+            error: publicStatus.error,
+          };
+        } else {
+          status = rawStatus;
+        }
+
         await job.updateProgress(status);
 
         const logMessage = `Got status ${JSON.stringify(status)}`;
@@ -70,16 +99,32 @@ export class StatusHandlerService {
   }
 
   private hasVideoOutput(result: any): boolean {
-    return !!(result?.message || result?.video || result?.download_url);
+    return !!(result?.message || result?.video || result?.download_url || result?.video_url || result?.result);
   }
 
   private async processVideoResult(result: any, job: Job): Promise<any> {
-    // Normalize uprez output shape: prefer download_url, fallback to video
-    const url = result.download_url || result.video;
+    const url = result.result || result.download_url || result.video_url || result.video;
     if (!url || result.requires_auth) {
       return result;
     }
-    await job.log(`${new Date().toISOString()}: Returning URL for client download`);
+
+    const needsR2Upload = (result.result || result.video_url) && !result.download_url;
+
+    if (needsR2Upload) {
+      try {
+        await job.log(`${new Date().toISOString()}: Uploading video to R2`);
+        const presignedUrl = await this.r2UploadService.downloadAndUploadVideo(url, String(job.id));
+        await job.log(`${new Date().toISOString()}: Video uploaded to R2`);
+        result.r2_url = presignedUrl;
+        return result;
+      } catch (error: any) {
+        await job.log(`${new Date().toISOString()}: R2 upload failed, using original URL`);
+        console.error('R2 upload error:', error);
+        result.r2_url = url;
+        return result;
+      }
+    }
+
     result.r2_url = url;
     return result;
   }
