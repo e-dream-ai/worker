@@ -33,6 +33,7 @@ export class CLIService {
     want2v: this.createQueueConfig('want2v'),
     wani2v: this.createQueueConfig('wani2v'),
     wani2vlora: this.createQueueConfig('wani2vlora'),
+    qwenimage: this.createQueueConfig('qwenimage'),
   };
 
   constructor() {
@@ -62,7 +63,7 @@ export class CLIService {
 
     if (!algorithm) {
       throw new InvalidArgumentError(
-        "Missing 'infinidream_algorithm'. Allowed values: animatediff, hunyuan, deforum, uprez, wan-t2v, wan-i2v, wan-i2v-lora"
+        "Missing 'infinidream_algorithm'. Allowed values: animatediff, hunyuan, deforum, uprez, wan-t2v, wan-i2v, wan-i2v-lora, qwen-image"
       );
     }
 
@@ -81,9 +82,11 @@ export class CLIService {
         return 'wani2v';
       case 'wan-i2v-lora':
         return 'wani2vlora';
+      case 'qwen-image':
+        return 'qwenimage';
       default:
         throw new InvalidArgumentError(
-          `Unknown 'infinidream_algorithm': ${algorithm}. Allowed values: animatediff, hunyuan, deforum, uprez, wan-t2v, wan-i2v, wan-i2v-lora`
+          `Unknown 'infinidream_algorithm': ${algorithm}. Allowed values: animatediff, hunyuan, deforum, uprez, wan-t2v, wan-i2v, wan-i2v-lora, qwen-image`
         );
     }
   }

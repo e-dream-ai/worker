@@ -62,6 +62,14 @@ interface Wan22I2VLoraParams {
   enable_safety_checker?: boolean;
 }
 
+interface QwenImageParams {
+  prompt: string;
+  size?: string;
+  seed?: number;
+  negative_prompt?: string;
+  enable_safety_checker?: boolean;
+}
+
 export async function handleImageJob(job: Job): Promise<any> {
   const { prompt = 'A walk in the park', seed = 1337, steps = 20, width = 512, height = 512 } = job.data;
   const filenamePrefix = String(job.id);
@@ -500,6 +508,32 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const { id: runpodId } = await endpoints.wanI2VLora.run(input);
   await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
+}
+
+export async function handleQwenImageJob(job: Job): Promise<any> {
+  const { prompt, size, seed = -1, negative_prompt = '', enable_safety_checker = true } = job.data as QwenImageParams;
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  const input: Record<string, unknown> = {
+    prompt,
+    seed,
+    negative_prompt,
+    enable_safety_checker,
+  };
+
+  if (size) {
+    if (typeof size !== 'string') {
+      throw new Error('size must be a string in format "W*H", e.g., "1024*1024" or "1328*1328"');
+    }
+    input.size = size;
+  }
+
+  const { id: runpodId } = await endpoints.qwenImage.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
 }
 
 function createAnimatediffWorkflow(params: {

@@ -1,0 +1,8 @@
+{
+  "infinidream_algorithm": "qwen-image",
+  "prompt": "A fashion-forward woman sitting at cobblestone street in Paris, wearing a camel trench coat and high heels, wind catching her scarf, soft golden hour light hitting her cheekbones",
+  "size": "1328*1328",
+  "seed": -1,
+  "negative_prompt": "",
+  "enable_safety_checker": true
+}
