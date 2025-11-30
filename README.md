@@ -287,4 +287,6 @@ python3 run_qwen_image_batch.py
 
 1. Visit https://www.runpod.io/console/serverless/user/endpoint/89vs9h0qx0g966?tab=requests to see recent activity and cancel jobs you don't wish to keep running.
 2. https://apps.apple.com/us/app/red-2-ui-for-redis/id1491764008?mt=12 is helpful for seeing what's in Redis
-3. https://gpu-worker-0ac312b41451.herokuapp.com/admin/queues/ for the Bull Dashboard (login the user "admin" and the password from the .env)
+3. https://gpu-worker-0ac312b41451.herokuapp.com/admin/queues/ for the stage and
+   https://gpu-worker-prod-8775591876d9.herokuapp.com/admin/queues for alpha
+   Bull Dashboard (login the user "admin" and the password from the .env)
