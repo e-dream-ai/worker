@@ -32,6 +32,10 @@ export const env = cleanEnv(process.env, {
   R2_PRESIGNED_EXPIRY: str({ default: '86400' }),
 
   WORKER_URL: str({ default: 'http://localhost:3000' }),
+  VIDEO_SERVICE_URL: str({ default: 'http://localhost:5000' }),
+  VIDEO_SERVICE_API_KEY: str({ default: '' }),
+  BACKEND_URL: str({ default: 'http://localhost:8080/api/v1' }),
+  BACKEND_API_KEY: str({ default: '' }),
 
   ADMIN_PASS: str({ default: '' }),
 });

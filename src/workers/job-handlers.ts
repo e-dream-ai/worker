@@ -4,9 +4,11 @@ import { existsSync } from 'fs';
 import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
 import { R2UploadService } from '../services/r2-upload.service.js';
+import { VideoServiceClient } from '../services/video-service.client.js';
 
 const statusHandler = new StatusHandlerService();
 const r2UploadService = new R2UploadService();
+const videoServiceClient = new VideoServiceClient();
 
 interface Wan22T2V720Params {
   prompt: string;
@@ -136,6 +138,8 @@ export async function handleVideoJob(job: Job): Promise<any> {
     frame_count = 64,
     frame_rate = 8,
     motion_scale = 1,
+    dream_uuid,
+    auto_upload = true,
   } = job.data;
 
   const promptsJson = JSON.stringify(prompts);
@@ -165,7 +169,25 @@ export async function handleVideoJob(job: Job): Promise<any> {
   });
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleVideoJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 export async function handleHunyuanVideoJob(job: Job): Promise<any> {
@@ -206,7 +228,7 @@ export async function handleHunyuanVideoJob(job: Job): Promise<any> {
 }
 
 export async function handleDeforumVideoJob(job: Job): Promise<any> {
-  const { ...promptData } = job.data;
+  const { dream_uuid, auto_upload = true, ...promptData } = job.data;
   const prompts = {};
   const otherParams = {};
 
@@ -232,7 +254,13 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   });
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.deforum, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.deforum, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+  }
+
+  return result;
 }
 
 export async function handleUprezVideoJob(job: Job): Promise<any> {
@@ -247,6 +275,8 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     tile_size = 512,
     tile_padding = 10,
     quality = 'high',
+    dream_uuid,
+    auto_upload = true,
   } = job.data || {};
 
   const input: Record<string, unknown> = {
@@ -280,7 +310,13 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.uprez.run({ input });
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+  }
+
+  return result;
 }
 
 export async function handleWanT2VJob(job: Job): Promise<any> {
