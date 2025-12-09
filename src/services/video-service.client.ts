@@ -49,6 +49,8 @@ export class VideoServiceClient {
       const r2Path = await this.uploadVideoToR2(videoUrl, dreamUuid, userIdentifier);
       await this.updateDreamOriginalVideo(dreamUuid, r2Path);
 
+      await this.turnOnVideoServiceWorker();
+
       const extension = 'mp4';
       const response = await axios.post(
         `${this.videoServiceUrl}/process-video`,
@@ -74,6 +76,23 @@ export class VideoServiceClient {
         stack: error.stack,
       });
       return false;
+    }
+  }
+
+  private async turnOnVideoServiceWorker(): Promise<void> {
+    try {
+      await axios.post(
+        `${this.backendUrl}/job/worker`,
+        {},
+        {
+          headers: {
+            Authorization: `Api-Key ${this.backendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } catch (error: any) {
+      console.error('Failed to turn on video service worker:', error.message || error);
     }
   }
 
