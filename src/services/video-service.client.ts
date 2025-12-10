@@ -49,9 +49,10 @@ export class VideoServiceClient {
       const r2Path = await this.uploadVideoToR2(videoUrl, dreamUuid, userIdentifier);
       await this.updateDreamOriginalVideo(dreamUuid, r2Path);
 
+      const extension = 'mp4';
+
       await this.turnOnVideoServiceWorker();
 
-      const extension = 'mp4';
       const response = await axios.post(
         `${this.videoServiceUrl}/process-video`,
         {
@@ -82,7 +83,7 @@ export class VideoServiceClient {
   private async turnOnVideoServiceWorker(): Promise<void> {
     try {
       await axios.post(
-        `${this.backendUrl}/job/worker`,
+        `${this.backendUrl}/dream/job/worker`,
         {},
         {
           headers: {
