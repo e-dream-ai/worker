@@ -21,7 +21,8 @@ There are two ways to use this project:
    - `node dist/prompt.js prompt/wan-t2v-example.json` (creates `prompt/wan-t2v-example.mp4`)
    - `node dist/prompt.js prompt/wan-i2v-example.json` (creates `prompt/wan-i2v-example.mp4`)
    - `node dist/prompt.js prompt/wan-i2v-lora-example.json` (creates `prompt/wan-i2v-lora-example.mp4`)
-   - By default, output files are saved alongside the input JSON with a `.mp4` extension
+   - `node dist/prompt.js prompt/qwen-image-example.json` (creates `prompt/qwen-image-example.png`)
+   - By default, output files are saved alongside the input JSON with a `.mp4` extension (or `.png` for image generation like qwen-image)
    - Use `-o` to specify a custom output path: `node dist/prompt.js prompt/deforum-fish.json -o my-custom-name.mp4`
 
    **Automatic Image Upload (wan-i2v and wan-i2v-lora only):**
@@ -49,7 +50,7 @@ Required env vars (local development)
 - ADMIN_PASS (password for username `admin` in the admin UI)
 - Redis: use local redis info (`REDIS_HOST=localhost`, `REDIS_PORT=6379`, `REDIS_PASSWORD=''`).
 
-Note: Public endpoints like `wan-t2v`, `wan-i2v`, and `wan-i2v-lora` only require `RUNPOD_API_KEY` (no endpoint ID needed).
+Note: Public endpoints like `wan-t2v`, `wan-i2v`, `wan-i2v-lora`, and `qwen-image` only require `RUNPOD_API_KEY` (no endpoint ID needed).
 
 For automatic image upload (wan-i2v and wan-i2v-lora jobs), also required:
 
@@ -68,6 +69,7 @@ node dist/prompt.js prompt/deforum-fish.json -o ./out/deforum.mp4
 node dist/prompt.js prompt/wan-t2v-example.json -o ./out/wan-t2v.mp4
 node dist/prompt.js prompt/wan-i2v-example.json -o ./out/wan-i2v.mp4
 node dist/prompt.js prompt/wan-i2v-lora-example.json -o ./out/wan-i2v-lora.mp4
+node dist/prompt.js prompt/qwen-image-example.json -o ./out/qwen-image.png
 ```
 
 How it works
@@ -216,8 +218,75 @@ The `run_uprez_batch.py` script allows you to automatically uprez all dreams in 
      - `marker`: Text to mark processed dreams (default: "uprez")
      - `existing_playlist_uuid`: UUID of existing output playlist (optional). If set, new uprezed videos will be added to this playlist instead of creating a new one.
 
+### E) Qwen-Image Batch Processing
+
+The `run_qwen_image_batch.py` script allows you to generate multiple images using Qwen-Image with a single prompt, automatically downloading them to a specified output folder.
+
+**Prerequisites:**
+
+1. Install Python dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Build TypeScript (if not already built):
+
+   ```bash
+   npm run build
+   ```
+
+3. Ensure Redis is running and accessible (same Redis instance as the worker)
+
+**Setup:**
+
+1. Configure `scripts/qwen-image-config.json`:
+
+   ```json
+   {
+     "prompt": "Your prompt here",
+     "num_generations": 5,
+     "output_folder": "generated-images",
+     "output_filename": "qwen-image",
+     "size": "1328*1328",
+     "seed": -1,
+     "negative_prompt": "",
+     "enable_safety_checker": true
+   }
+   ```
+
+   **Configuration Options:**
+
+   - `prompt` (required): The text prompt for image generation
+   - `num_generations` (required): Number of images to generate
+   - `output_folder` (required): Directory where images will be saved (relative to worker directory or absolute path)
+   - `output_filename` (optional): Base filename for generated images (default: "qwen-image")
+     - For multiple generations, files will be named: `{output_filename}_0001.png`, `{output_filename}_0002.png`, etc.
+     - For single generation, file will be named: `{output_filename}.png`
+   - `size`: Image size in format "W*H" (e.g., "1024*1024", "1328\*1328")
+   - `seed`: Random seed for generation (-1 for random, or specific number for reproducibility)
+   - `negative_prompt`: Negative prompt to avoid certain elements
+   - `enable_safety_checker`: Enable safety checker (default: true)
+
+2. The output folder will be created automatically if it doesn't exist.
+
+**Running the script:**
+
+```bash
+cd scripts
+python3 run_qwen_image_batch.py
+```
+
+**Environment Variables:**
+
+- `REDIS_HOST` (default: `localhost`) or `REDISCLOUD_URL`
+- `REDIS_PORT` (default: `6379`)
+- `REDIS_PASSWORD` (optional, empty string if none)
+
 ## Ops
 
 1. Visit https://www.runpod.io/console/serverless/user/endpoint/89vs9h0qx0g966?tab=requests to see recent activity and cancel jobs you don't wish to keep running.
 2. https://apps.apple.com/us/app/red-2-ui-for-redis/id1491764008?mt=12 is helpful for seeing what's in Redis
-3. https://gpu-worker-0ac312b41451.herokuapp.com/admin/queues/ for the Bull Dashboard (login the user "admin" and the password from the .env)
+3. https://gpu-worker-0ac312b41451.herokuapp.com/admin/queues/ for the stage and
+   https://gpu-worker-prod-8775591876d9.herokuapp.com/admin/queues for alpha
+   Bull Dashboard (login the user "admin" and the password from the .env)
