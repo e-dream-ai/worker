@@ -312,13 +312,32 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
 
+  await job.log(
+    `${new Date().toISOString()}: [handleUprezVideoJob] Status handler completed, checking upload conditions`
+  );
+  await job.log(
+    `${new Date().toISOString()}: [handleUprezVideoJob] dream_uuid: ${dream_uuid || 'not set'}, auto_upload: ${auto_upload}, has_r2_url: ${!!result?.r2_url}`
+  );
+
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    await job.log(`${new Date().toISOString()}: [handleUprezVideoJob] Starting upload for dream ${dream_uuid}`);
     try {
       await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+      await job.log(`${new Date().toISOString()}: [handleUprezVideoJob] Upload completed successfully`);
     } catch (error: any) {
+      await job.log(`${new Date().toISOString()}: [handleUprezVideoJob] Upload failed: ${error.message || error}`);
       console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
     }
   } else if (dream_uuid) {
+    const skipReason = JSON.stringify({
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+    });
+    await job.log(
+      `${new Date().toISOString()}: [handleUprezVideoJob] Upload skipped for dream ${dream_uuid}: ${skipReason}`
+    );
     console.error(`[handleUprezVideoJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
       auto_upload,
@@ -326,8 +345,11 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
       result_keys: result ? Object.keys(result) : 'no result',
       result: result,
     });
+  } else {
+    await job.log(`${new Date().toISOString()}: [handleUprezVideoJob] No dream_uuid, skipping upload`);
   }
 
+  await job.log(`${new Date().toISOString()}: [handleUprezVideoJob] Returning result, job should complete`);
   return result;
 }
 
