@@ -8,6 +8,9 @@ export class WorkerFactory {
   static createWorker(name: string, handler: JobHandler): Worker {
     const worker = new Worker(name, handler, {
       connection: redisClient,
+      lockDuration: 5 * 60 * 60 * 1000,
+      stalledInterval: 5 * 60 * 1000,
+      maxStalledCount: 20,
     });
 
     worker.on('failed', (job, error: Error) => {
