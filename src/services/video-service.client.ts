@@ -127,6 +127,12 @@ export class VideoServiceClient {
       throw new Error('R2 client not initialized');
     }
 
+    const r2Path = this.extractR2PathFromPresignedUrl(videoUrl);
+    if (r2Path) {
+      console.log(`Video already in R2, skipping upload. Path: ${r2Path}`);
+      return r2Path;
+    }
+
     const response = await fetch(videoUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
@@ -157,5 +163,20 @@ export class VideoServiceClient {
     await this.s3Client.send(command);
 
     return objectKey;
+  }
+
+  private extractR2PathFromPresignedUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname.includes('r2.cloudflarestorage.com')) {
+        const pathParts = urlObj.pathname.split('/');
+        if (pathParts.length >= 3) {
+          return pathParts.slice(2).join('/');
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }

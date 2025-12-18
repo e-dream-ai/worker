@@ -32,17 +32,10 @@ export class StatusHandlerService {
     const result = this.extractResult(finalStatus);
 
     if (!this.hasVideoOutput(result)) {
-      await job.log(
-        `${new Date().toISOString()}: No video URL in result, status ${JSON.stringify(finalStatus)}, extracted result: ${JSON.stringify(result)}`
-      );
       throw new Error(`No video URL in result, status ${JSON.stringify(finalStatus)}`);
     }
 
-    const processedResult = await this.processVideoResult(result, job);
-    await job.log(
-      `${new Date().toISOString()}: Video result processed, r2_url: ${processedResult?.r2_url || 'missing'}`
-    );
-    return processedResult;
+    return await this.processVideoResult(result, job);
   }
 
   private async pollForCompletion(
