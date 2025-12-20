@@ -347,7 +347,9 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
     max_tokens,
     enable_prompt_optimization = false,
     enable_safety_checker = true,
-  } = job.data as Wan22T2V720Params;
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as Wan22T2V720Params & { dream_uuid?: string; auto_upload?: boolean };
 
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('prompt is required and must be a string');
@@ -390,7 +392,43 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.wanT2V.run(input);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleWanT2VJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleWanT2VJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 export async function handleWanI2VJob(job: Job): Promise<any> {
