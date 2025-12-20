@@ -559,7 +559,15 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
 }
 
 export async function handleQwenImageJob(job: Job): Promise<any> {
-  const { prompt, size, seed = -1, negative_prompt = '', enable_safety_checker = true } = job.data as QwenImageParams;
+  const {
+    prompt,
+    size,
+    seed = -1,
+    negative_prompt = '',
+    enable_safety_checker = true,
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as QwenImageParams & { dream_uuid?: string; auto_upload?: boolean };
 
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('prompt is required and must be a string');
@@ -581,7 +589,25 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.qwenImage.run(input);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url);
+    } catch (error: any) {
+      console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleQwenImageJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 function createAnimatediffWorkflow(params: {

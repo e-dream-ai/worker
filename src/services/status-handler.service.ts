@@ -8,6 +8,8 @@ interface RunpodStatus {
   output?: {
     message?: string;
     video?: string;
+    image?: string;
+    image_url?: string;
     download_url?: string;
     video_url?: string;
     requires_auth?: boolean;
@@ -31,8 +33,12 @@ export class StatusHandlerService {
     );
     const result = this.extractResult(finalStatus);
 
+    if (this.hasImageOutput(result)) {
+      return await this.processImageResult(result, job);
+    }
+
     if (!this.hasVideoOutput(result)) {
-      throw new Error(`No video URL in result, status ${JSON.stringify(finalStatus)}`);
+      throw new Error(`No video or image URL in result, status ${JSON.stringify(finalStatus)}`);
     }
 
     return await this.processVideoResult(result, job);
@@ -55,12 +61,14 @@ export class StatusHandlerService {
         if (isPublicEndpoint) {
           const publicStatus = rawStatus as PublicEndpointResponse;
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
+          const imageUrl = publicStatus.output?.image_url || publicStatus.output?.image || publicStatus.output?.result;
           status = {
             status: publicStatus.status,
             completed: publicStatus.status === 'COMPLETED',
             output: publicStatus.output
               ? {
                   video_url: videoUrl,
+                  image_url: typeof imageUrl === 'string' ? imageUrl : undefined,
                   result: publicStatus.output.result,
                   ...publicStatus.output,
                 }
@@ -102,6 +110,14 @@ export class StatusHandlerService {
     return !!(result?.message || result?.video || result?.download_url || result?.video_url || result?.result);
   }
 
+  private hasImageOutput(result: any): boolean {
+    return !!(
+      result?.image ||
+      result?.image_url ||
+      (result?.result && !result?.video && !result?.video_url && !result?.download_url)
+    );
+  }
+
   private async processVideoResult(result: any, job: Job): Promise<any> {
     const url = result.result || result.download_url || result.video_url || result.video;
     if (!url || result.requires_auth) {
@@ -115,6 +131,33 @@ export class StatusHandlerService {
         await job.log(`${new Date().toISOString()}: Uploading video to R2`);
         const presignedUrl = await this.r2UploadService.downloadAndUploadVideo(url, String(job.id));
         await job.log(`${new Date().toISOString()}: Video uploaded to R2`);
+        result.r2_url = presignedUrl;
+        return result;
+      } catch (error: any) {
+        await job.log(`${new Date().toISOString()}: R2 upload failed, using original URL`);
+        console.error('R2 upload error:', error);
+        result.r2_url = url;
+        return result;
+      }
+    }
+
+    result.r2_url = url;
+    return result;
+  }
+
+  private async processImageResult(result: any, job: Job): Promise<any> {
+    const url = result.result || result.download_url || result.image_url || result.image;
+    if (!url || result.requires_auth) {
+      return result;
+    }
+
+    const needsR2Upload = (result.result || result.image_url || result.image) && !result.download_url;
+
+    if (needsR2Upload) {
+      try {
+        await job.log(`${new Date().toISOString()}: Uploading image to R2`);
+        const presignedUrl = await this.r2UploadService.downloadAndUploadImage(url, String(job.id));
+        await job.log(`${new Date().toISOString()}: Image uploaded to R2`);
         result.r2_url = presignedUrl;
         return result;
       } catch (error: any) {
