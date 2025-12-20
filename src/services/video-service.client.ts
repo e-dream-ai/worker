@@ -9,6 +9,9 @@ interface DreamInfo {
     uuid: string;
     cognitoId?: string;
   };
+  mediaType?: string;
+  video?: string | null;
+  original_video?: string | null;
 }
 
 export class VideoServiceClient {
@@ -134,7 +137,7 @@ export class VideoServiceClient {
     }
   }
 
-  private async getDreamInfo(dreamUuid: string): Promise<DreamInfo> {
+  async getDreamInfo(dreamUuid: string): Promise<DreamInfo> {
     const response = await axios.get(`${this.backendUrl}/dream/${dreamUuid}`, {
       headers: {
         Authorization: `Api-Key ${this.backendApiKey}`,
