@@ -146,6 +146,28 @@ export class VideoServiceClient {
     return response.data.data.dream;
   }
 
+  async setDreamFailed(dreamUuid: string, error: string): Promise<void> {
+    try {
+      await axios.post(
+        `${this.backendUrl}/dream/${dreamUuid}/status/failed`,
+        { error },
+        {
+          headers: {
+            Authorization: `Api-Key ${this.backendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } catch (error: any) {
+      console.error(`Failed to set dream ${dreamUuid} as failed:`, {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+    }
+  }
+
   private async updateDreamOriginalVideo(dreamUuid: string, r2Path: string): Promise<void> {
     await axios.put(
       `${this.backendUrl}/dream/${dreamUuid}`,

@@ -1,8 +1,11 @@
 import { Worker } from 'bullmq';
 import redisClient from '../shared/redis.js';
 import env from '../shared/env.js';
+import { VideoServiceClient } from '../services/video-service.client.js';
 
 type JobHandler = (job: any) => Promise<any>;
+
+const videoServiceClient = new VideoServiceClient();
 
 export class WorkerFactory {
   static createWorker(name: string, handler: JobHandler): Worker {
@@ -10,10 +13,21 @@ export class WorkerFactory {
       connection: redisClient,
     });
 
-    worker.on('failed', (job, error: Error) => {
-      console.error(
-        `Job failed: ${name} error: ${this.serializeError(error)}, job data: ${JSON.stringify(job?.toJSON())}`
-      );
+    worker.on('failed', async (job, error: Error) => {
+      const errorMessage = this.serializeError(error);
+      console.error(`Job failed: ${name} error: ${errorMessage}, job data: ${JSON.stringify(job?.toJSON())}`);
+
+      const jobData = job?.data;
+      if (jobData?.dream_uuid) {
+        try {
+          await videoServiceClient.setDreamFailed(
+            jobData.dream_uuid,
+            errorMessage.length > 10000 ? errorMessage.substring(0, 10000) : errorMessage
+          );
+        } catch (err: any) {
+          console.error(`Failed to set dream ${jobData.dream_uuid} as failed:`, err.message || err);
+        }
+      }
     });
 
     worker.on('completed', (job, returnValue) => {
