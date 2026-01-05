@@ -14,16 +14,16 @@ export class WorkerFactory {
     });
 
     worker.on('failed', async (job, error: Error) => {
-      const errorMessage = this.serializeError(error);
-      const cleanErrorMessage = this.extractErrorMessage(error);
-      console.error(`Job failed: ${name} error: ${errorMessage}, job data: ${JSON.stringify(job?.toJSON())}`);
+      const serializedError = this.serializeError(error);
+      const rawErrorMessage = this.extractRawErrorMessage(error);
+      console.error(`Job failed: ${name} error: ${serializedError}, job data: ${JSON.stringify(job?.toJSON())}`);
 
       const jobData = job?.data;
       if (jobData?.dream_uuid) {
         try {
           await videoServiceClient.setDreamFailed(
             jobData.dream_uuid,
-            cleanErrorMessage.length > 10000 ? cleanErrorMessage.substring(0, 10000) : cleanErrorMessage
+            rawErrorMessage.length > 10000 ? rawErrorMessage.substring(0, 10000) : rawErrorMessage
           );
         } catch (err: any) {
           console.error(`Failed to set dream ${jobData.dream_uuid} as failed:`, err.message || err);
@@ -50,31 +50,15 @@ export class WorkerFactory {
     return JSON.stringify(error, Object.getOwnPropertyNames(error));
   }
 
-  private static extractErrorMessage(error: Error): string {
+  private static extractRawErrorMessage(error: Error): string {
+    if (typeof error.message === 'string' && error.message.length) {
+      return error.message;
+    }
+
     try {
-      let parsedMessage: any;
-      try {
-        parsedMessage = JSON.parse(error.message);
-      } catch {
-        parsedMessage = error.message;
-      }
-
-      if (typeof parsedMessage === 'object' && parsedMessage !== null) {
-        if (parsedMessage.error) {
-          return parsedMessage.error;
-        }
-        if (parsedMessage.status && parsedMessage.error) {
-          return parsedMessage.error;
-        }
-        if (parsedMessage.status === 'FAILED' && parsedMessage.error) {
-          return parsedMessage.error;
-        }
-        return parsedMessage.error || parsedMessage.message || JSON.stringify(parsedMessage);
-      }
-
-      return typeof parsedMessage === 'string' ? parsedMessage : error.message;
+      return JSON.stringify(error, Object.getOwnPropertyNames(error));
     } catch {
-      return error.message || 'An unknown error occurred';
+      return 'Unknown error';
     }
   }
 }
