@@ -50,7 +50,7 @@ export class VideoServiceClient {
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
 
       const r2Path = await this.uploadVideoToR2(videoUrl, dreamUuid, userIdentifier);
-      await this.updateDreamOriginalVideo(dreamUuid, r2Path);
+      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'video');
 
       const extension = 'mp4';
 
