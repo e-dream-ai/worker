@@ -89,7 +89,7 @@ export class VideoServiceClient {
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
 
       const { r2Path, extension } = await this.uploadImageToR2(imageUrl, dreamUuid, userIdentifier);
-      await this.updateDreamOriginalVideo(dreamUuid, r2Path);
+      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image');
 
       await this.turnOnVideoServiceWorker();
 
@@ -168,20 +168,22 @@ export class VideoServiceClient {
     }
   }
 
-  private async updateDreamOriginalVideo(dreamUuid: string, r2Path: string): Promise<void> {
-    await axios.put(
-      `${this.backendUrl}/dream/${dreamUuid}`,
-      {
-        original_video: r2Path,
-        status: 'queue',
+  private async updateDreamOriginalVideo(dreamUuid: string, r2Path: string, mediaType?: string): Promise<void> {
+    const updateData: any = {
+      original_video: r2Path,
+      status: 'queue',
+    };
+
+    if (mediaType) {
+      updateData.mediaType = mediaType;
+    }
+
+    await axios.put(`${this.backendUrl}/dream/${dreamUuid}`, updateData, {
+      headers: {
+        Authorization: `Api-Key ${this.backendApiKey}`,
+        'Content-Type': 'application/json',
       },
-      {
-        headers: {
-          Authorization: `Api-Key ${this.backendApiKey}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    });
   }
 
   private async uploadVideoToR2(videoUrl: string, dreamUuid: string, userIdentifier: string): Promise<string> {
