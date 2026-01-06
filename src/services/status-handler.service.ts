@@ -5,6 +5,7 @@ import { R2UploadService } from './r2-upload.service.js';
 interface RunpodStatus {
   status: string;
   completed: boolean;
+  progress?: number;
   output?: {
     message?: string;
     video?: string;
@@ -79,7 +80,13 @@ export class StatusHandlerService {
           status = rawStatus;
         }
 
-        await job.updateProgress(status);
+        const progressData = {
+          ...status,
+          dream_uuid: job.data.dream_uuid,
+          user_id: job.data.user_id,
+        };
+
+        await job.updateProgress(progressData);
 
         const logMessage = `Got status ${JSON.stringify(status)}`;
         if (lastLogMessage !== logMessage) {
