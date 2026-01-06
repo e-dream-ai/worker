@@ -59,6 +59,11 @@ export class StatusHandlerService {
       try {
         const rawStatus = await endpoint.status(runpodId);
 
+        const logStatus = JSON.parse(JSON.stringify(rawStatus));
+        if (logStatus.progress !== undefined) {
+          console.log(`[StatusHandler] Job ${runpodId} progress: ${logStatus.progress}%`);
+        }
+
         if (isPublicEndpoint) {
           const publicStatus = rawStatus as PublicEndpointResponse;
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
@@ -77,7 +82,25 @@ export class StatusHandlerService {
             error: publicStatus.error,
           };
         } else {
-          status = rawStatus;
+          let detectedProgress = rawStatus.progress;
+          if (detectedProgress === undefined && typeof rawStatus.output === 'number') {
+            detectedProgress = rawStatus.output;
+          }
+
+          if (
+            detectedProgress === undefined &&
+            (rawStatus.status === 'IN_QUEUE' || rawStatus.status === 'IN_PROGRESS')
+          ) {
+            detectedProgress = 0;
+          }
+
+          status = {
+            status: rawStatus.status,
+            completed: rawStatus.completed || rawStatus.status === 'COMPLETED',
+            progress: detectedProgress,
+            output: typeof rawStatus.output === 'number' ? undefined : rawStatus.output,
+            error: rawStatus.error,
+          };
         }
 
         const progressData = {
