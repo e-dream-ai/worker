@@ -21,7 +21,7 @@ interface RunpodStatus {
 export class StatusHandlerService {
   private readonly r2UploadService: R2UploadService;
 
-  constructor(private readonly defaultPollIntervalMs: number = 1000) {
+  constructor(private readonly defaultPollIntervalMs: number = 5000) {
     this.r2UploadService = new R2UploadService();
   }
 
