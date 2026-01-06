@@ -59,11 +59,6 @@ export class StatusHandlerService {
       try {
         const rawStatus = await endpoint.status(runpodId);
 
-        const logStatus = JSON.parse(JSON.stringify(rawStatus));
-        if (logStatus.progress !== undefined) {
-          console.log(`[StatusHandler] Job ${runpodId} progress: ${logStatus.progress}%`);
-        }
-
         if (isPublicEndpoint) {
           const publicStatus = rawStatus as PublicEndpointResponse;
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
