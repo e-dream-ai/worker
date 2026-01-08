@@ -27,6 +27,23 @@ export class StatusHandlerService {
     this.r2UploadService = new R2UploadService();
   }
 
+  private parseGenerationTimeMs(publicStatus: PublicEndpointResponse): number | undefined {
+    const output: any = publicStatus?.output;
+    const candidates = [output?.generation_time, output?.generationTime];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return Math.round(candidate * 1000);
+      }
+      if (typeof candidate === 'string') {
+        const parsed = Number.parseFloat(candidate);
+        if (Number.isFinite(parsed)) {
+          return Math.round(parsed * 1000);
+        }
+      }
+    }
+    return undefined;
+  }
+
   async handleStatus(endpoint: any, runpodId: string, job: Job, pollIntervalMs?: number): Promise<any> {
     const finalStatus = await this.pollForCompletion(
       endpoint,
@@ -56,6 +73,7 @@ export class StatusHandlerService {
     const isPublicEndpoint = endpoint instanceof PublicEndpointService;
     let status: RunpodStatus | undefined;
     let lastLogMessage = '';
+    const startedAtMs = Date.now();
 
     do {
       try {
@@ -66,9 +84,9 @@ export class StatusHandlerService {
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
           const imageUrl = publicStatus.output?.image_url || publicStatus.output?.image || publicStatus.output?.result;
 
-          let executionTime: number | undefined;
-          if (typeof publicStatus.output?.generation_time === 'number') {
-            executionTime = Math.round(publicStatus.output.generation_time * 1000);
+          let executionTime: number | undefined = this.parseGenerationTimeMs(publicStatus);
+          if (executionTime === undefined && publicStatus.status === 'COMPLETED') {
+            executionTime = Date.now() - startedAtMs;
           }
 
           status = {
@@ -140,7 +158,7 @@ export class StatusHandlerService {
 
   private extractResult(status: RunpodStatus): any {
     const result = JSON.parse(JSON.stringify(status))?.output || {};
-    if (status.executionTime) {
+    if (typeof status.executionTime === 'number') {
       result.render_duration = status.executionTime;
     }
     return result;

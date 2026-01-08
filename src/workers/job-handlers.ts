@@ -411,24 +411,6 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
   }
 
   return result;
-
-  if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
-  } else if (dream_uuid) {
-    console.error(`[handleWanT2VJob] Upload skipped for dream ${dream_uuid}:`, {
-      has_dream_uuid: !!dream_uuid,
-      auto_upload,
-      has_r2_url: !!result?.r2_url,
-      result_keys: result ? Object.keys(result) : 'no result',
-      result: result,
-    });
-  }
-
-  return result;
 }
 
 export async function handleWanI2VJob(job: Job): Promise<any> {
