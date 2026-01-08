@@ -1,7 +1,8 @@
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { PublicEndpointService, PublicEndpointResponse } from './public-endpoint.service.js';
 import { R2UploadService } from './r2-upload.service.js';
 import { RunpodCancelService } from './runpod-cancel.service.js';
+import redisClient from '../shared/redis.js';
 
 interface RunpodStatus {
   status: string;
@@ -79,15 +80,32 @@ export class StatusHandlerService {
     const startedAtMs = Date.now();
 
     do {
-      if (job.data?.cancelled_by_user === true) {
-        await job.log(`${new Date().toISOString()}: Job cancelled by user, stopping polling`);
+      try {
+        const jobState = await job.getState();
+        if (jobState === 'failed') {
+          await job.log(`${new Date().toISOString()}: Job state is failed, checking if cancelled by user`);
 
-        if (job.data?.cancel_runpod !== false) {
-          await job.log(`${new Date().toISOString()}: Cancelling RunPod job ${runpodId}`);
-          await this.runpodCancelService.cancelJob(endpoint, runpodId);
+          const queue = new Queue(job.queueName, { connection: redisClient });
+          const freshJob = await queue.getJob(String(job.id));
+          await queue.close();
+
+          if (freshJob?.data?.cancelled_by_user === true) {
+            await job.log(`${new Date().toISOString()}: Job cancelled by user, stopping polling`);
+
+            if (freshJob.data?.cancel_runpod !== false) {
+              await job.log(`${new Date().toISOString()}: Cancelling RunPod job ${runpodId}`);
+              await this.runpodCancelService.cancelJob(endpoint, runpodId);
+            }
+
+            throw new Error('Job was cancelled by user');
+          }
         }
-
-        throw new Error('Job was cancelled by user');
+      } catch (stateError: any) {
+        if (stateError.message !== 'Job was cancelled by user') {
+          console.error('Error checking job state:', stateError);
+        } else {
+          throw stateError;
+        }
       }
 
       try {
