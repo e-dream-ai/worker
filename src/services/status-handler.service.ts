@@ -65,9 +65,16 @@ export class StatusHandlerService {
           const publicStatus = rawStatus as PublicEndpointResponse;
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
           const imageUrl = publicStatus.output?.image_url || publicStatus.output?.image || publicStatus.output?.result;
+
+          let executionTime: number | undefined;
+          if (typeof publicStatus.output?.generation_time === 'number') {
+            executionTime = Math.round(publicStatus.output.generation_time * 1000);
+          }
+
           status = {
             status: publicStatus.status,
             completed: publicStatus.status === 'COMPLETED',
+            executionTime: executionTime,
             output: publicStatus.output
               ? {
                   video_url: videoUrl,
