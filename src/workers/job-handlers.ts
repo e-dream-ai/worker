@@ -173,7 +173,7 @@ export async function handleVideoJob(job: Job): Promise<any> {
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
     }
@@ -257,7 +257,7 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.deforum, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+    await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
   }
 
   return result;
@@ -314,7 +314,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
     }
@@ -396,7 +396,7 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
     }
@@ -502,7 +502,7 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
     }
@@ -658,7 +658,7 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url);
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
     }
@@ -710,7 +710,7 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     try {
-      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url);
+      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, result.render_duration);
     } catch (error: any) {
       console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
     }

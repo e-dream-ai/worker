@@ -6,6 +6,8 @@ interface RunpodStatus {
   status: string;
   completed: boolean;
   progress?: number;
+  executionTime?: number;
+  delayTime?: number;
   output?: {
     message?: string;
     video?: string;
@@ -93,6 +95,8 @@ export class StatusHandlerService {
             status: rawStatus.status,
             completed: rawStatus.completed || rawStatus.status === 'COMPLETED',
             progress: detectedProgress,
+            executionTime: rawStatus.executionTime,
+            delayTime: rawStatus.delayTime,
             output: typeof rawStatus.output === 'number' ? undefined : rawStatus.output,
             error: rawStatus.error,
           };
@@ -128,7 +132,11 @@ export class StatusHandlerService {
   }
 
   private extractResult(status: RunpodStatus): any {
-    return JSON.parse(JSON.stringify(status))?.output;
+    const result = JSON.parse(JSON.stringify(status))?.output || {};
+    if (status.executionTime) {
+      result.render_duration = status.executionTime;
+    }
+    return result;
   }
 
   private hasVideoOutput(result: any): boolean {
