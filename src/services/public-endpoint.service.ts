@@ -144,4 +144,31 @@ export class PublicEndpointService {
       throw error;
     }
   }
+
+  async cancel(jobId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/cancel/${jobId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[PublicEndpointService.cancel] Error cancelling job:', {
+          endpoint: this.baseUrl,
+          jobId,
+          status: response.status,
+          errorText,
+        });
+      }
+    } catch (error: any) {
+      console.error('[PublicEndpointService.cancel] Failed to cancel job:', {
+        endpoint: this.baseUrl,
+        jobId,
+        error: error.message || 'Unknown error',
+      });
+    }
+  }
 }

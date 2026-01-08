@@ -14,6 +14,11 @@ export class WorkerFactory {
     });
 
     worker.on('failed', async (job, error: Error) => {
+      if (error.message === 'JOB_CANCELLED') {
+        console.log(`Job ${job?.id} was cancelled, skipping failure handling.`);
+        return;
+      }
+
       const serializedError = this.serializeError(error);
       const rawErrorMessage = this.extractRawErrorMessage(error);
       console.error(`Job failed: ${name} error: ${serializedError}, job data: ${JSON.stringify(job?.toJSON())}`);
