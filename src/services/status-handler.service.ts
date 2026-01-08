@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import { PublicEndpointService, PublicEndpointResponse } from './public-endpoint.service.js';
 import { R2UploadService } from './r2-upload.service.js';
+import { RunpodCancelService } from './runpod-cancel.service.js';
 
 interface RunpodStatus {
   status: string;
@@ -22,9 +23,11 @@ interface RunpodStatus {
 
 export class StatusHandlerService {
   private readonly r2UploadService: R2UploadService;
+  private readonly runpodCancelService: RunpodCancelService;
 
   constructor(private readonly defaultPollIntervalMs: number = 5000) {
     this.r2UploadService = new R2UploadService();
+    this.runpodCancelService = new RunpodCancelService();
   }
 
   private parseGenerationTimeMs(publicStatus: PublicEndpointResponse): number | undefined {
@@ -76,15 +79,15 @@ export class StatusHandlerService {
     const startedAtMs = Date.now();
 
     do {
-      const jobState = await job.getState().catch(() => 'removed');
-      if (jobState === 'removed') {
-        await job.log(`${new Date().toISOString()}: Job removed from queue, stopping remote job.`);
-        if (!isPublicEndpoint && typeof endpoint.cancel === 'function') {
-          await endpoint
-            .cancel(runpodId)
-            .catch((err: any) => console.error('Failed to cancel remote job:', err?.message || err));
+      if (job.data?.cancelled_by_user === true) {
+        await job.log(`${new Date().toISOString()}: Job cancelled by user, stopping polling`);
+
+        if (job.data?.cancel_runpod !== false) {
+          await job.log(`${new Date().toISOString()}: Cancelling RunPod job ${runpodId}`);
+          await this.runpodCancelService.cancelJob(endpoint, runpodId);
         }
-        throw new Error('JOB_CANCELLED');
+
+        throw new Error('Job was cancelled by user');
       }
 
       try {
