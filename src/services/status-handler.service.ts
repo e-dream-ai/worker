@@ -79,7 +79,7 @@ export class StatusHandlerService {
       const jobState = await job.getState().catch(() => 'removed');
       if (jobState === 'removed') {
         await job.log(`${new Date().toISOString()}: Job removed from queue, stopping remote job.`);
-        if (endpoint.cancel) {
+        if (!isPublicEndpoint && typeof endpoint.cancel === 'function') {
           await endpoint
             .cancel(runpodId)
             .catch((err: any) => console.error('Failed to cancel remote job:', err?.message || err));
