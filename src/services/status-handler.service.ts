@@ -137,6 +137,13 @@ export class StatusHandlerService {
           };
         } else {
           let detectedProgress = rawStatus.progress;
+          let previewFrame: string | undefined = undefined;
+
+          if (detectedProgress && typeof detectedProgress === 'object') {
+            previewFrame = detectedProgress.preview_frame;
+            detectedProgress = detectedProgress.progress;
+          }
+
           if (detectedProgress === undefined && typeof rawStatus.output === 'number') {
             detectedProgress = rawStatus.output;
           }
@@ -157,6 +164,10 @@ export class StatusHandlerService {
             output: typeof rawStatus.output === 'number' ? undefined : rawStatus.output,
             error: rawStatus.error,
           };
+
+          if (previewFrame) {
+            (status as any).preview_frame = previewFrame;
+          }
         }
 
         const progressData = {
