@@ -166,6 +166,7 @@ export class StatusHandlerService {
           };
 
           if (previewFrame) {
+            console.log(`[StatusHandler] Found preview frame for job ${job.id} (${previewFrame.length} bytes)`);
             (status as any).preview_frame = previewFrame;
           }
         }

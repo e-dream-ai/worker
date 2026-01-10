@@ -54,6 +54,7 @@ async function queueUprezJob() {
       tile_size: jsonData.tile_size ?? 1024,
       tile_padding: jsonData.tile_padding ?? 10,
       quality: jsonData.quality ?? 'high',
+      dream_uuid: jsonData.video_uuid,
     };
 
     if (jsonData.video_url) {
