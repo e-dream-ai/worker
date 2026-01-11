@@ -139,9 +139,19 @@ export class StatusHandlerService {
           let detectedProgress = rawStatus.progress;
           let previewFrame: string | undefined = undefined;
 
+          if (rawStatus.output && typeof rawStatus.output === 'object') {
+            const output = rawStatus.output as any;
+            if (previewFrame === undefined && output.preview_frame) {
+              previewFrame = output.preview_frame;
+            }
+            if ((detectedProgress === undefined || detectedProgress === 0) && typeof output.progress === 'number') {
+              detectedProgress = output.progress;
+            }
+          }
+
           if (detectedProgress && typeof detectedProgress === 'object') {
-            previewFrame = detectedProgress.preview_frame;
-            detectedProgress = detectedProgress.progress;
+            previewFrame = (detectedProgress as any).preview_frame;
+            detectedProgress = (detectedProgress as any).progress;
           }
 
           if (detectedProgress === undefined && typeof rawStatus.output === 'number') {
@@ -181,6 +191,10 @@ export class StatusHandlerService {
 
         const statusForLog = { ...(status as any) };
         delete statusForLog.preview_frame;
+        if (statusForLog.output && typeof statusForLog.output === 'object') {
+          statusForLog.output = { ...statusForLog.output };
+          delete statusForLog.output.preview_frame;
+        }
         const logMessage = `Got status ${JSON.stringify(statusForLog)}`;
         if (lastLogMessage !== logMessage) {
           lastLogMessage = logMessage;
