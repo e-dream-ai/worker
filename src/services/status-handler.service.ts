@@ -155,13 +155,6 @@ export class StatusHandlerService {
             detectedProgress = 0;
           }
 
-          if (previewFrame && job.data.dream_uuid) {
-            const previewKey = `job:preview:${job.data.dream_uuid}`;
-            redisClient.set(previewKey, previewFrame, 'EX', 3600).catch((err) => {
-              console.error(`[StatusHandler] Failed to save preview to Redis: ${err.message}`);
-            });
-          }
-
           status = {
             status: rawStatus.status,
             completed: rawStatus.completed || rawStatus.status === 'COMPLETED',
@@ -171,6 +164,11 @@ export class StatusHandlerService {
             output: typeof rawStatus.output === 'number' ? undefined : rawStatus.output,
             error: rawStatus.error,
           };
+
+          if (previewFrame) {
+            console.log(`[StatusHandler] Found preview frame for job ${job.id} (${previewFrame.length} bytes)`);
+            (status as any).preview_frame = previewFrame;
+          }
         }
 
         const progressData = {
@@ -181,8 +179,9 @@ export class StatusHandlerService {
 
         await job.updateProgress(progressData);
 
-        // Log status
-        const logMessage = `Got status ${JSON.stringify(status)}`;
+        const statusForLog = { ...(status as any) };
+        delete statusForLog.preview_frame;
+        const logMessage = `Got status ${JSON.stringify(statusForLog)}`;
         if (lastLogMessage !== logMessage) {
           lastLogMessage = logMessage;
           await job.log(`${new Date().toISOString()}: ${logMessage}`);
