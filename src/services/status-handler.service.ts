@@ -8,6 +8,8 @@ interface RunpodStatus {
   status: string;
   completed: boolean;
   progress?: number;
+  render_time_ms?: number;
+  countdown_ms?: number;
   executionTime?: number;
   delayTime?: number;
   output?: {
