@@ -140,6 +140,8 @@ export class StatusHandlerService {
         } else {
           let detectedProgress = rawStatus.progress;
           let previewFrame: string | undefined = undefined;
+          let renderTimeMs: number | undefined = undefined;
+          let countdownMs: number | undefined = undefined;
 
           if (rawStatus.output && typeof rawStatus.output === 'object') {
             const output = rawStatus.output as any;
@@ -149,10 +151,18 @@ export class StatusHandlerService {
             if ((detectedProgress === undefined || detectedProgress === 0) && typeof output.progress === 'number') {
               detectedProgress = output.progress;
             }
+            if (renderTimeMs === undefined && typeof output.render_time_ms === 'number') {
+              renderTimeMs = output.render_time_ms;
+            }
+            if (countdownMs === undefined && typeof output.countdown_ms === 'number') {
+              countdownMs = output.countdown_ms;
+            }
           }
 
           if (detectedProgress && typeof detectedProgress === 'object') {
             previewFrame = (detectedProgress as any).preview_frame;
+            renderTimeMs = (detectedProgress as any).render_time_ms;
+            countdownMs = (detectedProgress as any).countdown_ms;
             detectedProgress = (detectedProgress as any).progress;
           }
 
@@ -171,6 +181,8 @@ export class StatusHandlerService {
             status: rawStatus.status,
             completed: rawStatus.completed || rawStatus.status === 'COMPLETED',
             progress: detectedProgress,
+            render_time_ms: renderTimeMs,
+            countdown_ms: countdownMs,
             executionTime: rawStatus.executionTime,
             delayTime: rawStatus.delayTime,
             output: typeof rawStatus.output === 'number' ? undefined : rawStatus.output,
