@@ -50,6 +50,12 @@ export class StatusHandlerService {
   }
 
   async handleStatus(endpoint: any, runpodId: string, job: Job, pollIntervalMs?: number): Promise<any> {
+    await job.updateProgress({
+      dream_uuid: job.data.dream_uuid,
+      status: 'IN_PROGRESS',
+      progress: 0,
+    });
+
     const finalStatus = await this.pollForCompletion(
       endpoint,
       runpodId,
