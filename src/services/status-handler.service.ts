@@ -1,10 +1,16 @@
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { PublicEndpointService, PublicEndpointResponse } from './public-endpoint.service.js';
 import { R2UploadService } from './r2-upload.service.js';
+import { RunpodCancelService } from './runpod-cancel.service.js';
+import redisClient from '../shared/redis.js';
 
 interface RunpodStatus {
   status: string;
   completed: boolean;
+  progress?: number;
+  countdown_ms?: number;
+  executionTime?: number;
+  delayTime?: number;
   output?: {
     message?: string;
     video?: string;
@@ -19,9 +25,28 @@ interface RunpodStatus {
 
 export class StatusHandlerService {
   private readonly r2UploadService: R2UploadService;
+  private readonly runpodCancelService: RunpodCancelService;
 
-  constructor(private readonly defaultPollIntervalMs: number = 1000) {
+  constructor(private readonly defaultPollIntervalMs: number = 5000) {
     this.r2UploadService = new R2UploadService();
+    this.runpodCancelService = new RunpodCancelService();
+  }
+
+  private parseGenerationTimeMs(publicStatus: PublicEndpointResponse): number | undefined {
+    const output: any = publicStatus?.output;
+    const candidates = [output?.generation_time, output?.generationTime];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return Math.round(candidate * 1000);
+      }
+      if (typeof candidate === 'string') {
+        const parsed = Number.parseFloat(candidate);
+        if (Number.isFinite(parsed)) {
+          return Math.round(parsed * 1000);
+        }
+      }
+    }
+    return undefined;
   }
 
   async handleStatus(endpoint: any, runpodId: string, job: Job, pollIntervalMs?: number): Promise<any> {
@@ -53,8 +78,37 @@ export class StatusHandlerService {
     const isPublicEndpoint = endpoint instanceof PublicEndpointService;
     let status: RunpodStatus | undefined;
     let lastLogMessage = '';
+    const startedAtMs = Date.now();
 
     do {
+      try {
+        const jobState = await job.getState();
+        if (jobState === 'failed') {
+          await job.log(`${new Date().toISOString()}: Job state is failed, checking if cancelled by user`);
+
+          const queue = new Queue(job.queueName, { connection: redisClient });
+          const freshJob = await queue.getJob(String(job.id));
+          await queue.close();
+
+          if (freshJob?.data?.cancelled_by_user === true) {
+            await job.log(`${new Date().toISOString()}: Job cancelled by user, stopping polling`);
+
+            if (freshJob.data?.cancel_runpod !== false) {
+              await job.log(`${new Date().toISOString()}: Cancelling RunPod job ${runpodId}`);
+              await this.runpodCancelService.cancelJob(endpoint, runpodId);
+            }
+
+            throw new Error('Job was cancelled by user');
+          }
+        }
+      } catch (stateError: any) {
+        if (stateError.message !== 'Job was cancelled by user') {
+          console.error('Error checking job state:', stateError);
+        } else {
+          throw stateError;
+        }
+      }
+
       try {
         const rawStatus = await endpoint.status(runpodId);
 
@@ -62,9 +116,16 @@ export class StatusHandlerService {
           const publicStatus = rawStatus as PublicEndpointResponse;
           const videoUrl = publicStatus.output?.video_url || publicStatus.output?.result;
           const imageUrl = publicStatus.output?.image_url || publicStatus.output?.image || publicStatus.output?.result;
+
+          let executionTime: number | undefined = this.parseGenerationTimeMs(publicStatus);
+          if (executionTime === undefined && publicStatus.status === 'COMPLETED') {
+            executionTime = Date.now() - startedAtMs;
+          }
+
           status = {
             status: publicStatus.status,
             completed: publicStatus.status === 'COMPLETED',
+            executionTime: executionTime,
             output: publicStatus.output
               ? {
                   video_url: videoUrl,
@@ -76,12 +137,72 @@ export class StatusHandlerService {
             error: publicStatus.error,
           };
         } else {
-          status = rawStatus;
+          let detectedProgress = rawStatus.progress;
+          let previewFrame: string | undefined = undefined;
+          let countdownMs: number | undefined = undefined;
+
+          if (rawStatus.output && typeof rawStatus.output === 'object') {
+            const output = rawStatus.output as any;
+            if (previewFrame === undefined && output.preview_frame) {
+              previewFrame = output.preview_frame;
+            }
+            if ((detectedProgress === undefined || detectedProgress === 0) && typeof output.progress === 'number') {
+              detectedProgress = output.progress;
+            }
+            if (countdownMs === undefined && typeof output.countdown_ms === 'number') {
+              countdownMs = output.countdown_ms;
+            }
+          }
+
+          if (detectedProgress && typeof detectedProgress === 'object') {
+            previewFrame = (detectedProgress as any).preview_frame;
+            countdownMs = (detectedProgress as any).countdown_ms;
+            detectedProgress = (detectedProgress as any).progress;
+          }
+
+          if (detectedProgress === undefined && typeof rawStatus.output === 'number') {
+            detectedProgress = rawStatus.output;
+          }
+
+          if (
+            detectedProgress === undefined &&
+            (rawStatus.status === 'IN_QUEUE' || rawStatus.status === 'IN_PROGRESS')
+          ) {
+            detectedProgress = 0;
+          }
+
+          status = {
+            status: rawStatus.status,
+            completed: rawStatus.completed || rawStatus.status === 'COMPLETED',
+            progress: detectedProgress,
+            countdown_ms: countdownMs,
+            executionTime: rawStatus.executionTime,
+            delayTime: rawStatus.delayTime,
+            output: typeof rawStatus.output === 'number' ? undefined : rawStatus.output,
+            error: rawStatus.error,
+          };
+
+          if (previewFrame) {
+            console.log(`[StatusHandler] Found preview frame for job ${job.id} (${previewFrame.length} bytes)`);
+            (status as any).preview_frame = previewFrame;
+          }
         }
 
-        await job.updateProgress(status);
+        const progressData = {
+          ...status,
+          dream_uuid: job.data.dream_uuid,
+          user_id: job.data.user_id,
+        };
 
-        const logMessage = `Got status ${JSON.stringify(status)}`;
+        await job.updateProgress(progressData);
+
+        const statusForLog = { ...(status as any) };
+        delete statusForLog.preview_frame;
+        if (statusForLog.output && typeof statusForLog.output === 'object') {
+          statusForLog.output = { ...statusForLog.output };
+          delete statusForLog.output.preview_frame;
+        }
+        const logMessage = `Got status ${JSON.stringify(statusForLog)}`;
         if (lastLogMessage !== logMessage) {
           lastLogMessage = logMessage;
           await job.log(`${new Date().toISOString()}: ${logMessage}`);
@@ -103,7 +224,11 @@ export class StatusHandlerService {
   }
 
   private extractResult(status: RunpodStatus): any {
-    return JSON.parse(JSON.stringify(status))?.output;
+    const result = JSON.parse(JSON.stringify(status))?.output || {};
+    if (typeof status.executionTime === 'number') {
+      result.render_duration = status.executionTime;
+    }
+    return result;
   }
 
   private hasVideoOutput(result: any): boolean {

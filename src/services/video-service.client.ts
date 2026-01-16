@@ -44,13 +44,13 @@ export class VideoServiceClient {
     }
   }
 
-  async uploadGeneratedVideo(dreamUuid: string, videoUrl: string): Promise<boolean> {
+  async uploadGeneratedVideo(dreamUuid: string, videoUrl: string, renderDuration?: number): Promise<boolean> {
     try {
       const dream = await this.getDreamInfo(dreamUuid);
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
 
       const r2Path = await this.uploadVideoToR2(videoUrl, dreamUuid, userIdentifier);
-      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'video');
+      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'video', renderDuration);
 
       const extension = 'mp4';
 
@@ -83,13 +83,13 @@ export class VideoServiceClient {
     }
   }
 
-  async uploadGeneratedImage(dreamUuid: string, imageUrl: string): Promise<boolean> {
+  async uploadGeneratedImage(dreamUuid: string, imageUrl: string, renderDuration?: number): Promise<boolean> {
     try {
       const dream = await this.getDreamInfo(dreamUuid);
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
 
       const { r2Path, extension } = await this.uploadImageToR2(imageUrl, dreamUuid, userIdentifier);
-      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image');
+      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image', renderDuration);
 
       await this.turnOnVideoServiceWorker();
 
@@ -168,11 +168,20 @@ export class VideoServiceClient {
     }
   }
 
-  private async updateDreamOriginalVideo(dreamUuid: string, r2Path: string, mediaType?: string): Promise<void> {
+  private async updateDreamOriginalVideo(
+    dreamUuid: string,
+    r2Path: string,
+    mediaType?: string,
+    renderDuration?: number
+  ): Promise<void> {
     const updateData: any = {
       original_video: r2Path,
       status: 'queue',
     };
+
+    if (renderDuration !== undefined) {
+      updateData.render_duration = renderDuration;
+    }
 
     if (mediaType) {
       updateData.mediaType = mediaType;

@@ -16,6 +16,14 @@ export class WorkerFactory {
     worker.on('failed', async (job, error: Error) => {
       const serializedError = this.serializeError(error);
       const rawErrorMessage = this.extractRawErrorMessage(error);
+
+      const isCancelled = this.isUserCancellation(job, error);
+
+      if (isCancelled) {
+        console.info(`Job cancelled by user: ${name}, job data: ${JSON.stringify(job?.toJSON())}`);
+        return;
+      }
+
       console.error(`Job failed: ${name} error: ${serializedError}, job data: ${JSON.stringify(job?.toJSON())}`);
 
       const jobData = job?.data;
@@ -44,6 +52,33 @@ export class WorkerFactory {
     });
 
     return worker;
+  }
+
+  private static isUserCancellation(job: any, error: Error): boolean {
+    // Check if job was marked as cancelled
+    if (job?.data?.cancelled_by_user === true) {
+      return true;
+    }
+
+    // Check for BullMQ cancellation patterns
+    const errorMessage = error?.message?.toLowerCase() || '';
+    if (
+      errorMessage.includes('job was cancelled') ||
+      errorMessage.includes('job cancelled') ||
+      errorMessage.includes('user cancelled')
+    ) {
+      return true;
+    }
+
+    // Check if job has failedReason indicating cancellation
+    if (job?.failedReason) {
+      const failedReason = String(job.failedReason).toLowerCase();
+      if (failedReason.includes('cancelled') || failedReason.includes('canceled')) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private static serializeError(error: Error): string {
