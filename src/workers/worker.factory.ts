@@ -8,9 +8,10 @@ type JobHandler = (job: any) => Promise<any>;
 const videoServiceClient = new VideoServiceClient();
 
 export class WorkerFactory {
-  static createWorker(name: string, handler: JobHandler): Worker {
+  static createWorker(name: string, handler: JobHandler, concurrency: number = 20): Worker {
     const worker = new Worker(name, handler, {
       connection: redisClient,
+      concurrency,
     });
 
     worker.on('failed', async (job, error: Error) => {
