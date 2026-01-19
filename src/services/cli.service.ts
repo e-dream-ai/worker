@@ -108,6 +108,11 @@ export class CLIService {
         attempts: 1,
         backoff: { type: 'exponential', delay: 1000 },
       },
+      streams: {
+        events: {
+          maxLen: 100, // Limit event stream to last 100 events to reduce Redis memory usage
+        },
+      },
     });
 
     const events = new QueueEvents(name, {
