@@ -12,6 +12,8 @@ export class WorkerFactory {
     const worker = new Worker(name, handler, {
       connection: redisClient,
       concurrency,
+      lockDuration: 60000, // 60 seconds
+      maxStalledCount: 2,
     });
 
     worker.on('failed', async (job, error: Error) => {
