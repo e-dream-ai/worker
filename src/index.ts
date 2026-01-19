@@ -34,30 +34,75 @@ WorkerFactory.createWorker('qwenimage', handleQwenImageJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100, // Limit event stream to last 100 events to reduce Redis memory usage
+    },
+  },
 });
 const hunyuanVideoQueue = new Queue('hunyuanvideo', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const animatediffVideoQueue = new Queue('video', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const imageQueue = new Queue('image', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const uprezVideoQueue = new Queue('uprezvideo', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const wanT2VQueue = new Queue('want2v', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const wanI2VQueue = new Queue('wani2v', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const wanI2VLoraQueue = new Queue('wani2vlora', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 const qwenImageQueue = new Queue('qwenimage', {
   connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
 });
 
 const activeJobs = await hunyuanVideoQueue.getJobs(['active']);
