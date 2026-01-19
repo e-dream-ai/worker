@@ -100,6 +100,10 @@ export class StatusHandlerService {
 
             throw new Error('Job was cancelled by user');
           }
+
+          const failedReason = freshJob?.failedReason || 'Unknown reason';
+          await job.log(`${new Date().toISOString()}: Job failed in queue (${failedReason}), stopping polling`);
+          throw new Error(`Job failed in queue: ${failedReason}`);
         }
       } catch (stateError: any) {
         if (stateError.message !== 'Job was cancelled by user') {
