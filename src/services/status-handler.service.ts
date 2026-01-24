@@ -26,6 +26,7 @@ interface RunpodStatus {
 export class StatusHandlerService {
   private readonly r2UploadService: R2UploadService;
   private readonly runpodCancelService: RunpodCancelService;
+  private readonly previewTtlSeconds = 3 * 60 * 60;
 
   constructor(private readonly defaultPollIntervalMs: number = 5000) {
     this.r2UploadService = new R2UploadService();
@@ -188,12 +189,25 @@ export class StatusHandlerService {
 
           if (previewFrame) {
             console.log(`[StatusHandler] Found preview frame for job ${job.id} (${previewFrame.length} bytes)`);
-            (status as any).preview_frame = previewFrame;
+            await this.storePreviewFrame(job, previewFrame);
+          }
+
+          if (previewFrame && status.output && typeof status.output === 'object') {
+            const output = { ...(status.output as any) };
+            delete output.preview_frame;
+            (status as any).output = output;
           }
         }
 
+        const progressStatus = { ...(status as any) };
+        delete progressStatus.preview_frame;
+        if (progressStatus.output && typeof progressStatus.output === 'object') {
+          progressStatus.output = { ...progressStatus.output };
+          delete progressStatus.output.preview_frame;
+        }
+
         const progressData = {
-          ...status,
+          ...progressStatus,
           dream_uuid: job.data.dream_uuid,
           user_id: job.data.user_id,
         };
@@ -237,6 +251,19 @@ export class StatusHandlerService {
 
   private hasVideoOutput(result: any): boolean {
     return !!(result?.message || result?.video || result?.download_url || result?.video_url || result?.result);
+  }
+
+  private async storePreviewFrame(job: Job, previewFrame: string): Promise<void> {
+    const dreamUuid = job?.data?.dream_uuid;
+    if (!dreamUuid) {
+      return;
+    }
+    const previewKey = `job:preview:${dreamUuid}`;
+    try {
+      await redisClient.set(previewKey, previewFrame, 'EX', this.previewTtlSeconds);
+    } catch (error: any) {
+      console.error(`[StatusHandler] Failed to persist preview for job ${job.id}:`, error?.message ?? error);
+    }
   }
 
   private hasImageOutput(result: any): boolean {
