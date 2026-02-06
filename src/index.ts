@@ -104,6 +104,14 @@ const qwenImageQueue = new Queue('qwenimage', {
     },
   },
 });
+const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 1000,
+    },
+  },
+});
 
 const activeJobs = await hunyuanVideoQueue.getJobs(['active']);
 console.log(`Active jobs: ${JSON.stringify(activeJobs)}`);
@@ -122,6 +130,7 @@ createBullBoard({
     new BullMQAdapter(wanI2VQueue),
     new BullMQAdapter(wanI2VLoraQueue),
     new BullMQAdapter(qwenImageQueue),
+    new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,
 });

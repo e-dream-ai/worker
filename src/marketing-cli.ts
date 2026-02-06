@@ -16,7 +16,8 @@ program
   .option('--limit <n>', 'Limit number of users', (value) => Number(value))
   .option('--offset <n>', 'Offset for users', (value) => Number(value));
 
-program.parse();
+const argv = process.argv[2] === '--' ? [process.argv[0], process.argv[1], ...process.argv.slice(3)] : process.argv;
+program.parse(argv);
 
 const opts = program.opts();
 
