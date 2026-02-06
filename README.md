@@ -93,6 +93,8 @@ Marketing sends are triggered from the `worker/` project and processed by the ma
 
 - `worker/.env` must include:
   - `MARKETING_CONCURRENCY` (optional, default 50)
+- Resend template must include variable `UNSUBSCRIBE_URL` in the template body
+  - Example: `<a href="{{UNSUBSCRIBE_URL}}">Unsubscribe</a>`
 
 ### Build worker
 
