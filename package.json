@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"nodemon dist/index.js\"",
+    "marketing:send": "node dist/marketing-cli.js",
+    "marketing:worker": "node dist/marketing-worker.js",
     "lint": "eslint . -c src/*.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky install"

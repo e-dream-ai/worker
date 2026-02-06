@@ -84,3 +84,33 @@ How it works
 3. https://gpu-worker-0ac312b41451.herokuapp.com/admin/queues/ for the stage and
    https://gpu-worker-prod-8775591876d9.herokuapp.com/admin/queues for alpha
    Bull Dashboard (login the user "admin" and the password from the .env)
+
+## Marketing Email CLI (Worker)
+
+Marketing sends are triggered from the `worker/` project and processed by the marketing worker.
+
+### Prerequisites
+
+- `worker/.env` must include:
+  - `BACKEND_URL` (e.g. `https://api-stage.infinidream.ai/api/v1`)
+  - `MARKETING_EMAIL_SECRET`
+  - `MARKETING_CONCURRENCY` (optional, default 50)
+
+### Build worker
+
+```bash
+cd worker
+pnpm run build
+```
+
+### One-command send (starts worker + triggers send)
+
+```bash
+pnpm run marketing:send -- --template-id tpl_123 --dry-run
+```
+
+```bash
+pnpm run marketing:send -- --template-id tpl_123 --limit 100 --offset 0
+```
+
+The command starts the marketing worker in-process and will auto-exit when the queue is empty. You can also stop it early with Ctrl+C.
