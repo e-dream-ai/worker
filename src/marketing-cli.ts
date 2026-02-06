@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { Command } from 'commander';
 import { request } from 'undici';
 import env from './shared/env.js';
@@ -6,13 +5,18 @@ import { startMarketingEmailWorker } from './workers/marketing-email.worker.js';
 import { Queue } from 'bullmq';
 import redisClient from './shared/redis.js';
 
+const BACKEND_URL = 'https://api-stage.infinidream.ai/api/v1';
+
 const program = new Command();
 
 program
   .name('marketing-send')
   .description('Trigger marketing send via backend /marketing/send')
   .requiredOption('--template-id <id>', 'Resend template ID')
+  .requiredOption('--email-secret <secret>', 'Email secret used for backend auth')
   .option('--dry-run', 'Dry run only (no enqueue)', false)
+  .option('--email <email>', 'Target a specific user email')
+  .option('--user-id <id>', 'Target a specific user ID', (value) => Number(value))
   .option('--limit <n>', 'Limit number of users', (value) => Number(value))
   .option('--offset <n>', 'Offset for users', (value) => Number(value));
 
@@ -31,11 +35,10 @@ const parseOptionalNumber = (value: unknown, label: string): number | undefined 
 };
 
 const run = async () => {
-  if (!env.MARKETING_EMAIL_SECRET) {
-    throw new Error('MARKETING_EMAIL_SECRET is required');
-  }
-
-  const worker = startMarketingEmailWorker();
+  const worker = startMarketingEmailWorker({
+    emailSecret: opts.emailSecret,
+    backendUrl: BACKEND_URL,
+  });
   const queue = new Queue(env.MARKETING_QUEUE_NAME, { connection: redisClient });
 
   const body: Record<string, unknown> = {
@@ -45,14 +48,20 @@ const run = async () => {
 
   const limit = parseOptionalNumber(opts.limit, 'limit');
   const offset = parseOptionalNumber(opts.offset, 'offset');
+  const userId = parseOptionalNumber(opts.userId, 'user-id');
+  if (opts.email && userId !== undefined) {
+    throw new Error('Use either --email or --user-id, not both');
+  }
+  if (opts.email) body.email = String(opts.email);
+  if (userId !== undefined) body.userId = userId;
   if (limit !== undefined) body.limit = limit;
   if (offset !== undefined) body.offset = offset;
 
-  const { statusCode, body: responseBody } = await request(`${env.BACKEND_URL}/marketing/send`, {
+  const { statusCode, body: responseBody } = await request(`${BACKEND_URL}/marketing/send`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Email-Secret': env.MARKETING_EMAIL_SECRET,
+      'X-Email-Secret': opts.emailSecret,
     },
     body: JSON.stringify(body),
   });

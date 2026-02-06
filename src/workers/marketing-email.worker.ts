@@ -10,9 +10,17 @@ export type MarketingJobData = {
   unsubscribeToken: string;
 };
 
-export const startMarketingEmailWorker = (): Worker => {
-  if (!env.MARKETING_EMAIL_SECRET) {
-    throw new Error('MARKETING_EMAIL_SECRET is required to send marketing emails');
+type StartMarketingWorkerOptions = {
+  emailSecret?: string;
+  backendUrl?: string;
+};
+
+export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): Worker => {
+  const emailSecret = opts?.emailSecret ?? env.MARKETING_EMAIL_SECRET;
+  const backendUrl = opts?.backendUrl ?? env.BACKEND_URL;
+
+  if (!emailSecret) {
+    throw new Error('email secret is required to send marketing emails');
   }
 
   const worker = new Worker<MarketingJobData>(
@@ -20,11 +28,11 @@ export const startMarketingEmailWorker = (): Worker => {
     async (job) => {
       const { email, templateId, unsubscribeToken } = job.data;
 
-      const { statusCode, body } = await request(`${env.BACKEND_URL}/marketing/send-one`, {
+      const { statusCode, body } = await request(`${backendUrl}/marketing/send-one`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Email-Secret': env.MARKETING_EMAIL_SECRET,
+          'X-Email-Secret': emailSecret,
         },
         body: JSON.stringify({
           email,
