@@ -27,6 +27,7 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
     env.MARKETING_QUEUE_NAME,
     async (job) => {
       const { email, templateId, unsubscribeToken } = job.data;
+      await job.log(`Starting send: email=${email} templateId=${templateId}`);
 
       const { statusCode, body } = await request(`${backendUrl}/marketing/send-one`, {
         method: 'POST',
@@ -43,8 +44,12 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
 
       if (statusCode < 200 || statusCode >= 300) {
         const errorText = await body.text();
+        await job.log(`Send failed: status=${statusCode} body=${errorText}`);
         throw new Error(`Backend send-one failed: ${statusCode} ${errorText}`);
       }
+
+      await job.log(`Send succeeded: status=${statusCode}`);
+      return { statusCode, email, templateId };
     },
     {
       connection: redisClient,
@@ -55,8 +60,25 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
     }
   );
 
+  worker.on('completed', (job) => {
+    console.log(`Marketing email job completed: ${job.id} email=${job.data?.email}`);
+  });
+
   worker.on('failed', (job, error) => {
-    console.error(`Marketing email job failed: ${job?.id ?? 'unknown'} error: ${error?.message || error}`);
+    const attempts = job?.opts?.attempts ?? 1;
+    const attemptsMade = job?.attemptsMade ?? 0;
+    const isFinalFailure = attemptsMade >= attempts;
+
+    if (isFinalFailure) {
+      console.error(
+        `Marketing email job final failure: ${job?.id ?? 'unknown'} attempts=${attemptsMade}/${attempts} error: ${error?.message || error}`
+      );
+      return;
+    }
+
+    console.error(
+      `Marketing email job retrying: ${job?.id ?? 'unknown'} attempts=${attemptsMade}/${attempts} error: ${error?.message || error}`
+    );
   });
 
   worker.on('error', (error) => {
