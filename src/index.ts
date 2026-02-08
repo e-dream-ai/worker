@@ -5,10 +5,8 @@ import { Queue } from 'bullmq';
 import 'dotenv/config';
 import express from 'express';
 import basicAuth from 'express-basic-auth';
-import multer from 'multer';
 import env from './shared/env.js';
 import redisClient from './shared/redis.js';
-import { R2UploadService } from './services/r2-upload.service.js';
 import { WorkerFactory } from './workers/worker.factory.js';
 import {
   handleImageJob,
@@ -137,14 +135,6 @@ createBullBoard({
 
 const app = express();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-  },
-});
-const r2UploadService = new R2UploadService();
-
 app.use(express.json());
 
 app.use(
@@ -156,35 +146,6 @@ app.use(
 );
 
 app.use('/admin/queues', serverAdapter.getRouter());
-
-app.post('/api/upload-image', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      console.error('[POST /api/upload-image]', {
-        error: 'No image file provided',
-        hasFile: !!req.file,
-      });
-      res.status(400).json({ error: 'No image file provided' });
-      return;
-    }
-
-    const tempJobId = `upload-${Date.now()}`;
-    const filename = req.file.originalname || `image-${Date.now()}.png`;
-
-    const imageBuffer = req.file.buffer;
-    const presignedUrl = await r2UploadService.uploadImageBufferToR2(imageBuffer, tempJobId, filename);
-
-    res.json({ url: presignedUrl });
-  } catch (error: any) {
-    console.error('[POST /api/upload-image]', {
-      error: error.message || 'Unknown error',
-      stack: error.stack,
-      filename: req.file?.originalname,
-      fileSize: req.file?.size,
-    });
-    res.status(500).json({ error: error.message || 'Failed to upload image' });
-  }
-});
 
 app.listen(env.PORT, () => {
   console.log(`Running on port ${env.PORT} in ${env.NODE_ENV} mode...`);
