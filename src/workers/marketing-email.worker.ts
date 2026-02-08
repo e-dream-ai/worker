@@ -13,14 +13,19 @@ export type MarketingJobData = {
 type StartMarketingWorkerOptions = {
   emailSecret?: string;
   backendUrl?: string;
+  apiKey?: string;
 };
 
 export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): Worker => {
   const emailSecret = opts?.emailSecret ?? env.MARKETING_EMAIL_SECRET;
   const backendUrl = opts?.backendUrl ?? env.BACKEND_URL;
+  const apiKey = opts?.apiKey ?? env.BACKEND_API_KEY;
 
   if (!emailSecret) {
     throw new Error('email secret is required to send marketing emails');
+  }
+  if (!apiKey) {
+    throw new Error('backend api key is required to send marketing emails');
   }
 
   const worker = new Worker<MarketingJobData>(
@@ -34,6 +39,7 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
         headers: {
           'Content-Type': 'application/json',
           'X-Email-Secret': emailSecret,
+          Authorization: `Api-Key ${apiKey}`,
         },
         body: JSON.stringify({
           email,

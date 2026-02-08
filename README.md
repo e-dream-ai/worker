@@ -92,6 +92,9 @@ Marketing sends are triggered from the `worker/` project and processed by the ma
 ### Prerequisites
 
 - `worker/.env` must include:
+  - `BACKEND_URL` (backend API base URL, e.g. `https://api-stage.infinidream.ai/api/v1`)
+  - `BACKEND_API_KEY` (admin API key)
+  - `MARKETING_EMAIL_SECRET` (shared internal secret)
   - `MARKETING_CONCURRENCY` (optional, default 50)
 - Resend template must include variable `UNSUBSCRIBE_URL` in the template body
   - Example: `<a href="{{UNSUBSCRIBE_URL}}">Unsubscribe</a>`
@@ -106,23 +109,23 @@ pnpm run build
 ### One-command send (starts worker + triggers send)
 
 ```bash
-pnpm run marketing:send -- --template-id tpl_123 --email-secret your-secret --dry-run
+pnpm run marketing:send -- --template-id tpl_123 --dry-run
 ```
 
 ```bash
-pnpm run marketing:send -- --template-id tpl_123 --email-secret your-secret --limit 100 --offset 0
+pnpm run marketing:send -- --template-id tpl_123 --limit 100 --offset 0
 ```
 
 Send to one specific user:
 
 ```bash
-pnpm run marketing:send -- --template-id tpl_123 --email-secret your-secret --email user@example.com
+pnpm run marketing:send -- --template-id tpl_123 --email user@example.com
 ```
 
 or by user id:
 
 ```bash
-pnpm run marketing:send -- --template-id tpl_123 --email-secret your-secret --user-id 42
+pnpm run marketing:send -- --template-id tpl_123 --user-id 42
 ```
 
 The command starts the marketing worker in-process and will auto-exit when the queue is empty. You can also stop it early with Ctrl+C.
