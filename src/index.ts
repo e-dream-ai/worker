@@ -18,6 +18,7 @@ import {
   handleWanI2VJob,
   handleWanI2VLoraJob,
   handleQwenImageJob,
+  handleVideoIngestJob,
 } from './workers/job-handlers.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
@@ -29,6 +30,7 @@ WorkerFactory.createWorker('want2v', handleWanT2VJob);
 WorkerFactory.createWorker('wani2v', handleWanI2VJob);
 WorkerFactory.createWorker('wani2vlora', handleWanI2VLoraJob);
 WorkerFactory.createWorker('qwenimage', handleQwenImageJob);
+WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -102,6 +104,14 @@ const qwenImageQueue = new Queue('qwenimage', {
     },
   },
 });
+const videoingestQueue = new Queue('videoingest', {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
 const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
   connection: redisClient,
   streams: {
@@ -128,6 +138,7 @@ createBullBoard({
     new BullMQAdapter(wanI2VQueue),
     new BullMQAdapter(wanI2VLoraQueue),
     new BullMQAdapter(qwenImageQueue),
+    new BullMQAdapter(videoingestQueue),
     new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,

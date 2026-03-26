@@ -19,6 +19,7 @@ export const env = cleanEnv(process.env, {
   RUNPOD_ANIMATEDIFF_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_DEFORUM_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_UPREZ_ENDPOINT_ID: str({ default: '' }),
+  RUNPOD_VIDEOINGEST_ENDPOINT_ID: str({ default: '' }),
 
   /**
    * CLOUDFLARE R2
