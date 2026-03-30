@@ -72,6 +72,27 @@ interface QwenImageParams {
   enable_safety_checker?: boolean;
 }
 
+export async function handleVideoIngestJob(job: Job): Promise<any> {
+  const { dream_uuid, extension, type = 'video' } = job.data;
+
+  if (!dream_uuid) {
+    throw new Error('dream_uuid is required');
+  }
+
+  const input: Record<string, unknown> = {
+    type,
+    dream_uuid,
+  };
+
+  if (extension) {
+    input.extension = extension;
+  }
+
+  const { id: runpodId } = await endpoints.videoingest.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.videoingest, runpodId, job);
+}
+
 export async function handleImageJob(job: Job): Promise<any> {
   const { prompt = 'A walk in the park', seed = 1337, steps = 20, width = 512, height = 512 } = job.data;
   const filenamePrefix = String(job.id);

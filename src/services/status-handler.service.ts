@@ -250,7 +250,14 @@ export class StatusHandlerService {
   }
 
   private hasVideoOutput(result: any): boolean {
-    return !!(result?.message || result?.video || result?.download_url || result?.video_url || result?.result);
+    return !!(
+      result?.message ||
+      result?.video ||
+      result?.download_url ||
+      result?.video_url ||
+      result?.result ||
+      (result?.status === 'success' && result?.type === 'video')
+    );
   }
 
   private async storePreviewFrame(job: Job, previewFrame: string): Promise<void> {

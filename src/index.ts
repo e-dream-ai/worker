@@ -5,10 +5,8 @@ import { Queue } from 'bullmq';
 import 'dotenv/config';
 import express from 'express';
 import basicAuth from 'express-basic-auth';
-import multer from 'multer';
 import env from './shared/env.js';
 import redisClient from './shared/redis.js';
-import { R2UploadService } from './services/r2-upload.service.js';
 import { WorkerFactory } from './workers/worker.factory.js';
 import {
   handleImageJob,
@@ -20,6 +18,7 @@ import {
   handleWanI2VJob,
   handleWanI2VLoraJob,
   handleQwenImageJob,
+  handleVideoIngestJob,
 } from './workers/job-handlers.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
@@ -31,6 +30,7 @@ WorkerFactory.createWorker('want2v', handleWanT2VJob);
 WorkerFactory.createWorker('wani2v', handleWanI2VJob);
 WorkerFactory.createWorker('wani2vlora', handleWanI2VLoraJob);
 WorkerFactory.createWorker('qwenimage', handleQwenImageJob);
+WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -104,6 +104,22 @@ const qwenImageQueue = new Queue('qwenimage', {
     },
   },
 });
+const videoingestQueue = new Queue('videoingest', {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
+const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 1000,
+    },
+  },
+});
 
 const activeJobs = await hunyuanVideoQueue.getJobs(['active']);
 console.log(`Active jobs: ${JSON.stringify(activeJobs)}`);
@@ -122,19 +138,13 @@ createBullBoard({
     new BullMQAdapter(wanI2VQueue),
     new BullMQAdapter(wanI2VLoraQueue),
     new BullMQAdapter(qwenImageQueue),
+    new BullMQAdapter(videoingestQueue),
+    new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,
 });
 
 const app = express();
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-  },
-});
-const r2UploadService = new R2UploadService();
 
 app.use(express.json());
 
@@ -147,35 +157,6 @@ app.use(
 );
 
 app.use('/admin/queues', serverAdapter.getRouter());
-
-app.post('/api/upload-image', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      console.error('[POST /api/upload-image]', {
-        error: 'No image file provided',
-        hasFile: !!req.file,
-      });
-      res.status(400).json({ error: 'No image file provided' });
-      return;
-    }
-
-    const tempJobId = `upload-${Date.now()}`;
-    const filename = req.file.originalname || `image-${Date.now()}.png`;
-
-    const imageBuffer = req.file.buffer;
-    const presignedUrl = await r2UploadService.uploadImageBufferToR2(imageBuffer, tempJobId, filename);
-
-    res.json({ url: presignedUrl });
-  } catch (error: any) {
-    console.error('[POST /api/upload-image]', {
-      error: error.message || 'Unknown error',
-      stack: error.stack,
-      filename: req.file?.originalname,
-      fileSize: req.file?.size,
-    });
-    res.status(500).json({ error: error.message || 'Failed to upload image' });
-  }
-});
 
 app.listen(env.PORT, () => {
   console.log(`Running on port ${env.PORT} in ${env.NODE_ENV} mode...`);
