@@ -64,6 +64,24 @@ interface Wan22I2VLoraParams {
   enable_safety_checker?: boolean;
 }
 
+interface LtxI2VParams {
+  prompt: string;
+  image: string;
+  duration?: number;
+  num_inference_steps?: number;
+  guidance?: number;
+  seed?: number;
+  high_noise_loras?: LoRAConfig[];
+  low_noise_loras?: LoRAConfig[];
+}
+
+interface NvidiaVsrParams {
+  video_url?: string;
+  video_uuid?: string;
+  upscale_factor?: number;
+  quality?: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA';
+}
+
 interface QwenImageParams {
   prompt: string;
   size?: string;
@@ -816,6 +834,126 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
     }
   } else if (dream_uuid) {
     console.error(`[handleZImageTurboJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+export async function handleLtxI2VJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    image,
+    duration = 5,
+    num_inference_steps = 30,
+    guidance = 5,
+    seed = -1,
+    high_noise_loras,
+    low_noise_loras,
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as LtxI2VParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  if (!image || typeof image !== 'string') {
+    throw new Error('image is required and must be a string URL, local file path, base64 string, or dream UUID');
+  }
+
+  const input: Record<string, unknown> = {
+    prompt,
+    image: await processImageForEndpoint(image, String(job.id)),
+    duration,
+    num_inference_steps,
+    guidance,
+    seed,
+  };
+
+  if (high_noise_loras && Array.isArray(high_noise_loras)) {
+    const validLoras = high_noise_loras.filter((lora) => lora && lora.path && lora.path.trim() !== '');
+    if (validLoras.length > 0) {
+      input.high_noise_loras = validLoras;
+    }
+  }
+
+  if (low_noise_loras && Array.isArray(low_noise_loras)) {
+    const validLoras = low_noise_loras.filter((lora) => lora && lora.path && lora.path.trim() !== '');
+    if (validLoras.length > 0) {
+      input.low_noise_loras = validLoras;
+    }
+  }
+
+  const { id: runpodId } = await endpoints.ltxI2V.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.ltxI2V, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleLtxI2VJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+export async function handleNvidiaVsrJob(job: Job): Promise<any> {
+  const {
+    video_url,
+    video_uuid,
+    upscale_factor = 2,
+    quality = 'HIGH',
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as NvidiaVsrParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  const input: Record<string, unknown> = {
+    upscale_factor,
+    quality,
+  };
+
+  const provided = [video_url, video_uuid].filter(Boolean);
+  if (provided.length === 0) {
+    throw new Error("Provide one of 'video_url' or 'video_uuid'");
+  }
+  if (provided.length > 1) {
+    throw new Error("Provide only one of 'video_url' or 'video_uuid'");
+  }
+
+  if (video_url) {
+    input.video_url = video_url;
+  } else if (video_uuid) {
+    input.video_uuid = video_uuid;
+  }
+
+  const { id: runpodId } = await endpoints.nvidiaVsr.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleNvidiaVsrJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
       auto_upload,
       has_r2_url: !!result?.r2_url,
