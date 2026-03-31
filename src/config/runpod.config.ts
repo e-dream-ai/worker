@@ -14,4 +14,5 @@ export const endpoints = {
   wanI2V: new PublicEndpointService('wan-2-2-i2v-720'),
   wanI2VLora: new PublicEndpointService('wan-2-2-t2v-720-lora'),
   qwenImage: new PublicEndpointService('qwen-image-t2i'),
+  zImageTurbo: new PublicEndpointService('z-image-turbo'),
 } as const;
