@@ -72,6 +72,28 @@ interface QwenImageParams {
   enable_safety_checker?: boolean;
 }
 
+type ZImageTurboSize =
+  | '512*512'
+  | '768*768'
+  | '1024*1024'
+  | '1280*1280'
+  | '1024*768'
+  | '768*1024'
+  | '1280*720'
+  | '720*1280';
+
+type ZImageTurboOutputFormat = 'png' | 'jpeg' | 'webp';
+
+interface ZImageTurboParams {
+  prompt: string;
+  image?: string;
+  size?: ZImageTurboSize;
+  strength?: number;
+  seed?: number;
+  output_format?: ZImageTurboOutputFormat;
+  enable_safety_checker?: boolean;
+}
+
 export async function handleVideoIngestJob(job: Job): Promise<any> {
   const { dream_uuid, extension, type = 'video' } = job.data;
 
@@ -719,6 +741,81 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
     }
   } else if (dream_uuid) {
     console.error(`[handleQwenImageJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+export async function handleZImageTurboJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    image,
+    size,
+    strength = 0.8,
+    seed = -1,
+    output_format = 'png',
+    enable_safety_checker = true,
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as ZImageTurboParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  const input: Record<string, unknown> = {
+    prompt,
+    seed,
+    output_format,
+    enable_safety_checker,
+  };
+
+  if (image) {
+    input.image = image;
+    input.strength = strength;
+  }
+
+  const VALID_SIZES: ZImageTurboSize[] = [
+    '512*512',
+    '768*768',
+    '1024*1024',
+    '1280*1280',
+    '1024*768',
+    '768*1024',
+    '1280*720',
+    '720*1280',
+  ];
+  const VALID_OUTPUT_FORMATS: ZImageTurboOutputFormat[] = ['png', 'jpeg', 'webp'];
+
+  if (size) {
+    if (!VALID_SIZES.includes(size)) {
+      throw new Error(`size must be one of: ${VALID_SIZES.join(', ')}`);
+    }
+    input.size = size;
+  }
+
+  if (!VALID_OUTPUT_FORMATS.includes(output_format)) {
+    throw new Error(`output_format must be one of: ${VALID_OUTPUT_FORMATS.join(', ')}`);
+  }
+
+  const { id: runpodId } = await endpoints.zImageTurbo.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.zImageTurbo, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleZImageTurboJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
       auto_upload,
       has_r2_url: !!result?.r2_url,
