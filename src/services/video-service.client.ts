@@ -1,7 +1,9 @@
 import axios from 'axios';
+import { Queue } from 'bullmq';
 import { Readable } from 'stream';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import env from '../shared/env.js';
+import redisClient from '../shared/redis.js';
 
 interface DreamInfo {
   uuid: string;
@@ -15,19 +17,17 @@ interface DreamInfo {
 }
 
 export class VideoServiceClient {
-  private readonly videoServiceUrl: string;
-  private readonly videoServiceApiKey: string;
   private readonly backendUrl: string;
   private readonly backendApiKey: string;
   private readonly s3Client: S3Client | null;
   private readonly bucketName: string;
+  private readonly videoingestQueue: Queue;
 
   constructor() {
-    this.videoServiceUrl = env.VIDEO_SERVICE_URL;
-    this.videoServiceApiKey = env.VIDEO_SERVICE_API_KEY;
     this.backendUrl = env.BACKEND_URL;
     this.backendApiKey = env.BACKEND_API_KEY;
     this.bucketName = env.R2_BUCKET_NAME;
+    this.videoingestQueue = new Queue('videoingest', { connection: redisClient });
 
     if (env.R2_ENDPOINT_URL && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY) {
       this.s3Client = new S3Client({
@@ -52,25 +52,13 @@ export class VideoServiceClient {
       const r2Path = await this.uploadVideoToR2(videoUrl, dreamUuid, userIdentifier);
       await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'video', renderDuration);
 
-      const extension = 'mp4';
+      await this.videoingestQueue.add('message', {
+        type: 'video',
+        dream_uuid: dreamUuid,
+        extension: 'mp4',
+      });
 
-      await this.turnOnVideoServiceWorker();
-
-      const response = await axios.post(
-        `${this.videoServiceUrl}/process-video`,
-        {
-          dream_uuid: dreamUuid,
-          extension: extension,
-        },
-        {
-          headers: {
-            Authorization: `Api-Key ${this.videoServiceApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      return response.data.success !== false;
+      return true;
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dreamUuid}:`, {
         message: error.message,
@@ -91,23 +79,13 @@ export class VideoServiceClient {
       const { r2Path, extension } = await this.uploadImageToR2(imageUrl, dreamUuid, userIdentifier);
       await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image', renderDuration);
 
-      await this.turnOnVideoServiceWorker();
+      await this.videoingestQueue.add('message', {
+        type: 'image',
+        dream_uuid: dreamUuid,
+        extension,
+      });
 
-      const response = await axios.post(
-        `${this.videoServiceUrl}/process-image`,
-        {
-          dream_uuid: dreamUuid,
-          extension: extension,
-        },
-        {
-          headers: {
-            Authorization: `Api-Key ${this.videoServiceApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      return response.data.success !== false;
+      return true;
     } catch (error: any) {
       console.error(`Failed to upload generated image for dream ${dreamUuid}:`, {
         message: error.message,
@@ -117,23 +95,6 @@ export class VideoServiceClient {
         stack: error.stack,
       });
       return false;
-    }
-  }
-
-  private async turnOnVideoServiceWorker(): Promise<void> {
-    try {
-      await axios.post(
-        `${this.backendUrl}/dream/job/worker`,
-        {},
-        {
-          headers: {
-            Authorization: `Api-Key ${this.backendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-    } catch (error: any) {
-      console.error('Failed to turn on video service worker:', error.message || error);
     }
   }
 
