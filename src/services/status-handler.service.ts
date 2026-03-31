@@ -277,7 +277,8 @@ export class StatusHandlerService {
     return !!(
       result?.image ||
       result?.image_url ||
-      (result?.result && !result?.video && !result?.video_url && !result?.download_url)
+      (result?.result && !result?.video && !result?.video_url && !result?.download_url) ||
+      (result?.status === 'success' && result?.type === 'image')
     );
   }
 
