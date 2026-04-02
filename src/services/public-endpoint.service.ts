@@ -144,4 +144,55 @@ export class PublicEndpointService {
       throw error;
     }
   }
+
+  async cancel(jobId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/cancel/${jobId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 404) {
+          console.warn('[PublicEndpointService.cancel]', {
+            endpoint: this.baseUrl,
+            jobId,
+            status: response.status,
+            message: 'Job not found (may already be completed or cancelled)',
+          });
+          return;
+        }
+        const error = new Error(`Failed to cancel job: ${response.status} ${response.statusText}. ${errorText}`);
+        console.error('[PublicEndpointService.cancel]', {
+          endpoint: this.baseUrl,
+          jobId,
+          status: response.status,
+          statusText: response.statusText,
+          errorText,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      console.info('[PublicEndpointService.cancel]', {
+        endpoint: this.baseUrl,
+        jobId,
+        message: 'Job cancelled successfully',
+      });
+    } catch (error: any) {
+      if (error.message?.includes('Failed to cancel job')) {
+        throw error;
+      }
+      console.error('[PublicEndpointService.cancel]', {
+        endpoint: this.baseUrl,
+        jobId,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
 }

@@ -19,6 +19,7 @@ export const env = cleanEnv(process.env, {
   RUNPOD_ANIMATEDIFF_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_DEFORUM_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_UPREZ_ENDPOINT_ID: str({ default: '' }),
+  RUNPOD_VIDEOINGEST_ENDPOINT_ID: str({ default: '' }),
 
   /**
    * CLOUDFLARE R2
@@ -32,6 +33,13 @@ export const env = cleanEnv(process.env, {
   R2_PRESIGNED_EXPIRY: str({ default: '86400' }),
 
   WORKER_URL: str({ default: 'http://localhost:3000' }),
+  VIDEO_SERVICE_URL: str({ default: 'http://localhost:5000' }),
+  VIDEO_SERVICE_API_KEY: str({ default: '' }),
+  BACKEND_URL: str({ default: 'http://localhost:8080/api/v1' }),
+  BACKEND_API_KEY: str({ default: '' }),
+  MARKETING_EMAIL_SECRET: str({ default: '' }),
+  MARKETING_QUEUE_NAME: str({ default: 'marketing-email' }),
+  MARKETING_CONCURRENCY: port({ default: 50 }),
 
   ADMIN_PASS: str({ default: '' }),
 });

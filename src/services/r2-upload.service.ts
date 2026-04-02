@@ -65,6 +65,38 @@ export class R2UploadService {
     }
   }
 
+  async downloadAndUploadImage(imageUrl: string, jobId: string, filename?: string): Promise<string> {
+    if (!this.s3Client) {
+      const error = new Error(
+        'R2 is not configured. Please set R2_ENDPOINT_URL, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.'
+      );
+      console.error('[R2UploadService.downloadAndUploadImage]', {
+        jobId,
+        imageUrl,
+        filename,
+        error: error.message,
+      });
+      throw error;
+    }
+
+    try {
+      const { stream, contentLength, contentType } = await this.fetchImageStream(imageUrl);
+      const objectKey = await this.uploadImageStreamToR2(stream, jobId, filename, contentType, contentLength);
+      const presignedUrl = await this.generatePresignedUrl(objectKey);
+
+      return presignedUrl;
+    } catch (error: any) {
+      console.error('[R2UploadService.downloadAndUploadImage]', {
+        jobId,
+        imageUrl,
+        filename,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
   private async fetchVideoStream(url: string): Promise<{ stream: Readable; contentLength?: number }> {
     try {
       const response = await fetch(url);
@@ -100,6 +132,53 @@ export class R2UploadService {
         throw error;
       }
       console.error('[R2UploadService.fetchVideoStream]', {
+        url,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  private async fetchImageStream(
+    url: string
+  ): Promise<{ stream: Readable; contentLength?: number; contentType?: string }> {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        const error = new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        console.error('[R2UploadService.fetchImageStream]', {
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      if (!response.body) {
+        const error = new Error('Response body is null');
+        console.error('[R2UploadService.fetchImageStream]', {
+          url,
+          error: error.message,
+        });
+        throw error;
+      }
+
+      const contentLength = response.headers.get('content-length');
+      const contentType = response.headers.get('content-type') || 'image/png';
+      const stream = Readable.fromWeb(response.body as ReadableStream);
+
+      return {
+        stream,
+        contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
+        contentType,
+      };
+    } catch (error: any) {
+      if (error.message?.includes('Failed to fetch image') || error.message?.includes('Response body is null')) {
+        throw error;
+      }
+      console.error('[R2UploadService.fetchImageStream]', {
         url,
         error: error.message || 'Unknown error',
         stack: error.stack,
@@ -148,6 +227,80 @@ export class R2UploadService {
       return objectKey;
     } catch (error: any) {
       console.error('[R2UploadService.uploadStreamToR2]', {
+        jobId,
+        filename,
+        bucketName: this.bucketName,
+        error: error.message || 'Unknown error',
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  private async uploadImageStreamToR2(
+    stream: Readable,
+    jobId: string,
+    filename?: string,
+    contentType?: string,
+    contentLength?: number
+  ): Promise<string> {
+    if (!this.s3Client) {
+      const error = new Error('S3 client not initialized');
+      console.error('[R2UploadService.uploadImageStreamToR2]', {
+        jobId,
+        filename,
+        error: error.message,
+      });
+      throw error;
+    }
+
+    try {
+      let fileExtension = '.png';
+      if (filename) {
+        const ext = extname(filename).toLowerCase();
+        if (ext) {
+          fileExtension = ext;
+        }
+      } else if (contentType) {
+        const mimeToExt: Record<string, string> = {
+          'image/jpeg': '.jpg',
+          'image/jpg': '.jpg',
+          'image/png': '.png',
+          'image/webp': '.webp',
+          'image/gif': '.gif',
+          'image/bmp': '.bmp',
+          'image/svg+xml': '.svg',
+          'image/tiff': '.tiff',
+          'image/x-icon': '.ico',
+          'image/heif': '.heif',
+          'image/heic': '.heic',
+        };
+        fileExtension = mimeToExt[contentType.toLowerCase()] || '.png';
+      }
+
+      const objectKey = filename
+        ? `${this.imageDirectory}/${filename}`
+        : `${this.imageDirectory}/${jobId}-${Date.now()}${fileExtension}`;
+
+      const finalContentType = contentType || this.getMimeTypeFromExtension(fileExtension);
+
+      const commandParams: any = {
+        Bucket: this.bucketName,
+        Key: objectKey,
+        Body: stream,
+        ContentType: finalContentType,
+      };
+
+      if (contentLength !== undefined && contentLength > 0 && !isNaN(contentLength)) {
+        commandParams.ContentLength = contentLength;
+      }
+
+      const command = new PutObjectCommand(commandParams);
+
+      await this.s3Client.send(command);
+      return objectKey;
+    } catch (error: any) {
+      console.error('[R2UploadService.uploadImageStreamToR2]', {
         jobId,
         filename,
         bucketName: this.bucketName,
@@ -270,6 +423,11 @@ export class R2UploadService {
       '.webp': 'image/webp',
       '.bmp': 'image/bmp',
       '.svg': 'image/svg+xml',
+      '.tiff': 'image/tiff',
+      '.tif': 'image/tiff',
+      '.ico': 'image/x-icon',
+      '.heif': 'image/heif',
+      '.heic': 'image/heic',
     };
     return extToMime[extension.toLowerCase()] || 'image/png';
   }

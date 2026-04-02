@@ -4,9 +4,11 @@ import { existsSync } from 'fs';
 import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
 import { R2UploadService } from '../services/r2-upload.service.js';
+import { VideoServiceClient } from '../services/video-service.client.js';
 
 const statusHandler = new StatusHandlerService();
 const r2UploadService = new R2UploadService();
+const videoServiceClient = new VideoServiceClient();
 
 interface Wan22T2V720Params {
   prompt: string;
@@ -60,6 +62,57 @@ interface Wan22I2VLoraParams {
   enable_base64_output?: boolean;
   enable_sync_mode?: boolean;
   enable_safety_checker?: boolean;
+}
+
+interface QwenImageParams {
+  prompt: string;
+  size?: string;
+  seed?: number;
+  negative_prompt?: string;
+  enable_safety_checker?: boolean;
+}
+
+type ZImageTurboSize =
+  | '512*512'
+  | '768*768'
+  | '1024*1024'
+  | '1280*1280'
+  | '1024*768'
+  | '768*1024'
+  | '1280*720'
+  | '720*1280';
+
+type ZImageTurboOutputFormat = 'png' | 'jpeg' | 'webp';
+
+interface ZImageTurboParams {
+  prompt: string;
+  image?: string;
+  size?: ZImageTurboSize;
+  strength?: number;
+  seed?: number;
+  output_format?: ZImageTurboOutputFormat;
+  enable_safety_checker?: boolean;
+}
+
+export async function handleVideoIngestJob(job: Job): Promise<any> {
+  const { dream_uuid, extension, type = 'video' } = job.data;
+
+  if (!dream_uuid) {
+    throw new Error('dream_uuid is required');
+  }
+
+  const input: Record<string, unknown> = {
+    type,
+    dream_uuid,
+  };
+
+  if (extension) {
+    input.extension = extension;
+  }
+
+  const { id: runpodId } = await endpoints.videoingest.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.videoingest, runpodId, job);
 }
 
 export async function handleImageJob(job: Job): Promise<any> {
@@ -128,6 +181,8 @@ export async function handleVideoJob(job: Job): Promise<any> {
     frame_count = 64,
     frame_rate = 8,
     motion_scale = 1,
+    dream_uuid,
+    auto_upload = true,
   } = job.data;
 
   const promptsJson = JSON.stringify(prompts);
@@ -157,7 +212,25 @@ export async function handleVideoJob(job: Job): Promise<any> {
   });
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleVideoJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 export async function handleHunyuanVideoJob(job: Job): Promise<any> {
@@ -198,7 +271,7 @@ export async function handleHunyuanVideoJob(job: Job): Promise<any> {
 }
 
 export async function handleDeforumVideoJob(job: Job): Promise<any> {
-  const { ...promptData } = job.data;
+  const { dream_uuid, auto_upload = true, ...promptData } = job.data;
   const prompts = {};
   const otherParams = {};
 
@@ -224,7 +297,13 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   });
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.deforum, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.deforum, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+  }
+
+  return result;
 }
 
 export async function handleUprezVideoJob(job: Job): Promise<any> {
@@ -239,6 +318,8 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     tile_size = 512,
     tile_padding = 10,
     quality = 'high',
+    dream_uuid,
+    auto_upload = true,
   } = job.data || {};
 
   const input: Record<string, unknown> = {
@@ -272,7 +353,25 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.uprez.run({ input });
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleUprezVideoJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 export async function handleWanT2VJob(job: Job): Promise<any> {
@@ -291,7 +390,9 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
     max_tokens,
     enable_prompt_optimization = false,
     enable_safety_checker = true,
-  } = job.data as Wan22T2V720Params;
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as Wan22T2V720Params & { dream_uuid?: string; auto_upload?: boolean };
 
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('prompt is required and must be a string');
@@ -334,7 +435,25 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.wanT2V.run(input);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleWanT2VJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 export async function handleWanI2VJob(job: Job): Promise<any> {
@@ -354,14 +473,16 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
     max_tokens,
     enable_prompt_optimization = false,
     enable_safety_checker = true,
-  } = job.data as Wan22I2V720Params;
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as Wan22I2V720Params & { dream_uuid?: string; auto_upload?: boolean };
 
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('prompt is required and must be a string');
   }
 
   if (!image || typeof image !== 'string') {
-    throw new Error('image is required and must be a string URL or local file path');
+    throw new Error('image is required and must be a string URL, local file path, base64 string, or dream UUID');
   }
 
   // Build input parameters
@@ -402,10 +523,67 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.wanI2V.run(input);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleWanI2VJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+function isUuid(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
+  try {
+    const dream = await videoServiceClient.getDreamInfo(dreamUuid);
+
+    if (dream.mediaType !== 'image') {
+      throw new Error(`Dream ${dreamUuid} is not an image dream (mediaType: ${dream.mediaType})`);
+    }
+
+    const imageUrl = dream.video || dream.original_video;
+
+    if (!imageUrl) {
+      throw new Error(`Dream ${dreamUuid} does not have an image URL (video or original_video)`);
+    }
+
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+      return `https://${imageUrl}`;
+    }
+
+    return imageUrl;
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      throw new Error(`Dream ${dreamUuid} not found`);
+    }
+    if (error.message?.includes('not an image dream') || error.message?.includes('does not have an image URL')) {
+      throw error;
+    }
+    throw new Error(`Failed to resolve image from dream UUID ${dreamUuid}: ${error.message || error}`);
+  }
 }
 
 async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
+  if (isUuid(imageInput)) {
+    return await resolveImageFromDreamUuid(imageInput);
+  }
+
   const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');
 
   if (isUrl) {
@@ -431,7 +609,7 @@ async function processImageForEndpoint(imageInput: string, jobId: string): Promi
     Buffer.from(imageInput, 'base64');
     return imageInput;
   } catch {
-    throw new Error(`Image input "${imageInput}" is not a valid URL, existing file path, or base64 string`);
+    throw new Error(`Image input "${imageInput}" is not a valid URL, existing file path, base64 string, or dream UUID`);
   }
 }
 export async function handleWanI2VLoraJob(job: Job): Promise<any> {
@@ -447,7 +625,9 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
     enable_base64_output = false,
     enable_sync_mode = false,
     enable_safety_checker = true,
-  } = job.data as Wan22I2VLoraParams;
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as Wan22I2VLoraParams & { dream_uuid?: string; auto_upload?: boolean };
 
   if (!prompt || typeof prompt !== 'string') {
     throw new Error('prompt is required and must be a string');
@@ -464,14 +644,14 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
 
   if (image) {
     if (typeof image !== 'string') {
-      throw new Error('image must be a string URL or local file path');
+      throw new Error('image must be a string URL, local file path, base64 string, or dream UUID');
     }
     input.image = await processImageForEndpoint(image, String(job.id));
   }
 
   if (last_image) {
     if (typeof last_image !== 'string') {
-      throw new Error('last_image must be a string URL or local file path');
+      throw new Error('last_image must be a string URL, local file path, base64 string, or dream UUID');
     }
     input.last_image = await processImageForEndpoint(last_image, String(job.id));
   }
@@ -499,7 +679,152 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
 
   const { id: runpodId } = await endpoints.wanI2VLora.run(input);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  return statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleWanI2VLoraJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+export async function handleQwenImageJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    size,
+    seed = -1,
+    negative_prompt = '',
+    enable_safety_checker = true,
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as QwenImageParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  const input: Record<string, unknown> = {
+    prompt,
+    seed,
+    negative_prompt,
+    enable_safety_checker,
+  };
+
+  if (size) {
+    if (typeof size !== 'string') {
+      throw new Error('size must be a string in format "W*H", e.g., "1024*1024" or "1328*1328"');
+    }
+    input.size = size;
+  }
+
+  const { id: runpodId } = await endpoints.qwenImage.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleQwenImageJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+export async function handleZImageTurboJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    image,
+    size,
+    strength = 0.8,
+    seed = -1,
+    output_format = 'png',
+    enable_safety_checker = true,
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as ZImageTurboParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  const input: Record<string, unknown> = {
+    prompt,
+    seed,
+    output_format,
+    enable_safety_checker,
+  };
+
+  if (image) {
+    input.image = image;
+    input.strength = strength;
+  }
+
+  const VALID_SIZES: ZImageTurboSize[] = [
+    '512*512',
+    '768*768',
+    '1024*1024',
+    '1280*1280',
+    '1024*768',
+    '768*1024',
+    '1280*720',
+    '720*1280',
+  ];
+  const VALID_OUTPUT_FORMATS: ZImageTurboOutputFormat[] = ['png', 'jpeg', 'webp'];
+
+  if (size) {
+    if (!VALID_SIZES.includes(size)) {
+      throw new Error(`size must be one of: ${VALID_SIZES.join(', ')}`);
+    }
+    input.size = size;
+  }
+
+  if (!VALID_OUTPUT_FORMATS.includes(output_format)) {
+    throw new Error(`output_format must be one of: ${VALID_OUTPUT_FORMATS.join(', ')}`);
+  }
+
+  const { id: runpodId } = await endpoints.zImageTurbo.run(input);
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.zImageTurbo, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleZImageTurboJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
 }
 
 function createAnimatediffWorkflow(params: {
