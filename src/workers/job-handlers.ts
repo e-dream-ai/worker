@@ -856,6 +856,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     lora = 'ltx-2-19b-lora-camera-control-static.safetensors',
     lora_strength = 0.4,
     high_noise_loras,
+    low_noise_loras,
     dream_uuid,
     auto_upload = true,
   } = job.data as LtxI2VParams & { dream_uuid?: string; auto_upload?: boolean };
@@ -882,6 +883,14 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     loraConfig = { on: true, lora, strength: lora_strength };
   }
 
+  let lowNoiseLoraConfig: { on: boolean; lora: string; strength: number } | undefined;
+  if (low_noise_loras && Array.isArray(low_noise_loras)) {
+    const valid = low_noise_loras.filter((l) => l && l.path && l.path.trim() !== '');
+    if (valid.length > 0) {
+      lowNoiseLoraConfig = { on: true, lora: valid[0].path, strength: valid[0].scale };
+    }
+  }
+
   // Compute frame count from duration: 1 + 8 * round(fps * duration / 8)
   const fps = 24;
   const frameCount = 1 + 8 * Math.round((fps * duration) / 8);
@@ -895,6 +904,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     fps,
     noiseSeed,
     loraConfig,
+    lowNoiseLoraConfig,
     filenamePrefix,
   });
 
@@ -947,6 +957,11 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
     upscale_factor,
     quality,
   };
+
+  const VALID_QUALITIES = ['LOW', 'MEDIUM', 'HIGH', 'ULTRA'] as const;
+  if (!VALID_QUALITIES.includes(quality as (typeof VALID_QUALITIES)[number])) {
+    throw new Error(`quality must be one of: ${VALID_QUALITIES.join(', ')}`);
+  }
 
   const provided = [video_url, video_uuid].filter(Boolean);
   if (provided.length === 0) {
@@ -1154,9 +1169,11 @@ function createLtxI2VWorkflow(params: {
   fps: number;
   noiseSeed: number;
   loraConfig?: { on: boolean; lora: string; strength: number };
+  lowNoiseLoraConfig?: { on: boolean; lora: string; strength: number };
   filenamePrefix: string;
 }) {
-  const { prompt, negative_prompt, frameCount, fps, noiseSeed, loraConfig, filenamePrefix } = params;
+  const { prompt, negative_prompt, frameCount, fps, noiseSeed, loraConfig, lowNoiseLoraConfig, filenamePrefix } =
+    params;
 
   // Node 1: Load distilled transformer
   // Node 2: DualCLIPLoader (Gemma 3 + text projection)
@@ -1181,6 +1198,9 @@ function createLtxI2VWorkflow(params: {
   };
   if (loraConfig) {
     (loraNode.inputs as Record<string, unknown>).lora_01 = loraConfig;
+  }
+  if (lowNoiseLoraConfig) {
+    (loraNode.inputs as Record<string, unknown>).lora_02 = lowNoiseLoraConfig;
   }
 
   return {
@@ -1234,7 +1254,7 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LoadImage',
     },
     '21': {
-      inputs: { image: ['20', 0], num_frames: 33 },
+      inputs: { image: ['20', 0], num_frames: frameCount },
       class_type: 'LTXVPreprocess',
     },
 

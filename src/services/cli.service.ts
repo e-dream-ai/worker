@@ -49,7 +49,7 @@ export class CLIService {
     let jsonData = this.readJsonFile(filePath);
     const queueName = this.inferQueueName(jsonData);
 
-    if (queueName === 'wani2v' || queueName === 'wani2vlora') {
+    if (queueName === 'wani2v' || queueName === 'wani2vlora' || queueName === 'ltxi2v') {
       jsonData = await this.processImagesForWanI2V(jsonData);
     }
 
