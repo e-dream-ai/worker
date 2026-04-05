@@ -1234,7 +1234,7 @@ function createLtxI2VWorkflow(params: {
       inputs: {
         clip_name1: 'gemma_3_12B_it_fpmixed.safetensors',
         clip_name2: 'ltx-2.3_text_projection_bf16.safetensors',
-        type: 'ltx',
+        type: 'ltxv',
       },
       class_type: 'DualCLIPLoader',
     },
@@ -1243,11 +1243,11 @@ function createLtxI2VWorkflow(params: {
       class_type: 'VAELoader',
     },
     '4': {
-      inputs: { vae_name: 'LTX23_audio_vae_bf16.safetensors' },
+      inputs: { vae_name: 'LTX23_audio_vae_bf16.safetensors', weight_dtype: 'bf16', device: 'main_device' },
       class_type: 'VAELoaderKJ',
     },
     '5': {
-      inputs: { upscale_model_name: 'ltx-2.3-spatial-upscaler-x2-1.0.safetensors' },
+      inputs: { model_name: 'ltx-2.3-spatial-upscaler-x2-1.0.safetensors' },
       class_type: 'LatentUpscaleModelLoader',
     },
     '6': loraNode,
@@ -1272,7 +1272,7 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LoadImage',
     },
     '21': {
-      inputs: { image: ['20', 0], num_frames: frameCount },
+      inputs: { image: ['20', 0], num_frames: frameCount, img_compression: 35 },
       class_type: 'LTXVPreprocess',
     },
 
@@ -1282,11 +1282,11 @@ function createLtxI2VWorkflow(params: {
       class_type: 'EmptyLTXVLatentVideo',
     },
     '31': {
-      inputs: { num_frames: frameCount, frame_rate: fps, batch_size: 1 },
+      inputs: { frames_number: frameCount, frame_rate: fps, batch_size: 1, audio_vae: ['4', 0] },
       class_type: 'LTXVEmptyLatentAudio',
     },
     '32': {
-      inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], bypass: false },
+      inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
     '33': {
@@ -1296,7 +1296,7 @@ function createLtxI2VWorkflow(params: {
 
     // ── Pass 1: Low-res (8 steps, LCM, LTXVScheduler) ──
     '40': {
-      inputs: { steps: 8, max_shift: 2.05, min_shift: 0.95, reverse: true, base_shift: 0.1 },
+      inputs: { steps: 8, max_shift: 2.05, base_shift: 0.95, stretch: true, terminal: 0.1 },
       class_type: 'LTXVScheduler',
     },
     '41': {
@@ -1332,7 +1332,7 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVLatentUpsampler',
     },
     '51': {
-      inputs: { latent: ['50', 0], vae: ['3', 0], image: ['21', 0], bypass: false },
+      inputs: { latent: ['50', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
     '52': {
@@ -1340,7 +1340,7 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVConcatAVLatent',
     },
     '60': {
-      inputs: { floats: '0.909375, 0.725, 0.421875, 0.0' },
+      inputs: { sigmas: '0.909375, 0.725, 0.421875, 0.0' },
       class_type: 'ManualSigmas',
     },
     '61': {
