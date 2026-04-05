@@ -1286,11 +1286,11 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVEmptyLatentAudio',
     },
     '32': {
-      inputs: { latent: ['30', 0], ref_image: ['21', 0], bypass: false },
+      inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
     '33': {
-      inputs: { samples_video: ['32', 0], samples_audio: ['31', 0] },
+      inputs: { video_latent: ['32', 0], audio_latent: ['31', 0] },
       class_type: 'LTXVConcatAVLatent',
     },
 
@@ -1322,7 +1322,7 @@ function createLtxI2VWorkflow(params: {
       class_type: 'SamplerCustomAdvanced',
     },
     '45': {
-      inputs: { samples: ['44', 0] },
+      inputs: { av_latent: ['44', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
 
@@ -1332,11 +1332,11 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVLatentUpsampler',
     },
     '51': {
-      inputs: { latent: ['50', 0], ref_image: ['21', 0], bypass: false },
+      inputs: { latent: ['50', 0], vae: ['3', 0], image: ['21', 0], bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
     '52': {
-      inputs: { samples_video: ['51', 0], samples_audio: ['45', 1] },
+      inputs: { video_latent: ['51', 0], audio_latent: ['45', 1] },
       class_type: 'LTXVConcatAVLatent',
     },
     '60': {
@@ -1366,17 +1366,24 @@ function createLtxI2VWorkflow(params: {
       class_type: 'SamplerCustomAdvanced',
     },
     '65': {
-      inputs: { samples: ['64', 0] },
+      inputs: { av_latent: ['64', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
 
     // ── Decode + Output ──
     '70': {
-      inputs: { tile_size: 512, overlap: 64, samples: ['65', 0], vae: ['3', 0] },
+      inputs: {
+        tile_size: 512,
+        overlap: 64,
+        temporal_size: 64,
+        temporal_overlap: 8,
+        samples: ['65', 0],
+        vae: ['3', 0],
+      },
       class_type: 'VAEDecodeTiled',
     },
     '71': {
-      inputs: { samples: ['65', 1], vae: ['4', 0] },
+      inputs: { samples: ['65', 1], audio_vae: ['4', 0] },
       class_type: 'LTXVAudioVAEDecode',
     },
     '80': {
