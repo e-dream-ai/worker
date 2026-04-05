@@ -631,6 +631,24 @@ async function processImageForEndpoint(imageInput: string, jobId: string): Promi
     throw new Error(`Image input "${imageInput}" is not a valid URL, existing file path, base64 string, or dream UUID`);
   }
 }
+
+async function processImageAsBase64ForComfyUI(imageInput: string, jobId: string): Promise<string> {
+  const resolved = await processImageForEndpoint(imageInput, jobId);
+
+  const isUrl = resolved.startsWith('http://') || resolved.startsWith('https://');
+  if (!isUrl) {
+    return resolved; // already base64
+  }
+
+  const { fetch } = await import('undici');
+  const response = await fetch(resolved);
+  if (!response.ok) {
+    throw new Error(`Failed to download image from ${resolved}: ${response.status}`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return buffer.toString('base64');
+}
+
 export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const {
     prompt,
@@ -869,7 +887,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     throw new Error('image is required and must be a string URL, local file path, base64 string, or dream UUID');
   }
 
-  const resolvedImage = await processImageForEndpoint(image, String(job.id));
+  const resolvedImage = await processImageAsBase64ForComfyUI(image, String(job.id));
 
   // Build LoRA config for Power Lora Loader — supports single lora param or high_noise_loras array
   let loraConfig: { on: boolean; lora: string; strength: number } | undefined;
