@@ -64,6 +64,25 @@ interface Wan22I2VLoraParams {
   enable_safety_checker?: boolean;
 }
 
+interface LtxI2VParams {
+  prompt: string;
+  image: string;
+  negative_prompt?: string;
+  duration?: number;
+  seed?: number;
+  lora?: string;
+  lora_strength?: number;
+  high_noise_loras?: LoRAConfig[];
+  low_noise_loras?: LoRAConfig[];
+}
+
+interface NvidiaVsrParams {
+  video_url?: string;
+  video_uuid?: string;
+  upscale_factor?: number;
+  quality?: 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA';
+}
+
 interface QwenImageParams {
   prompt: string;
   size?: string;
@@ -827,6 +846,160 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
   return result;
 }
 
+export async function handleLtxI2VJob(job: Job): Promise<any> {
+  const {
+    prompt,
+    image,
+    negative_prompt = 'worst quality, blurry, distorted, watermark, text, low quality',
+    duration = 2,
+    seed = -1,
+    lora = 'ltx-2-19b-lora-camera-control-static.safetensors',
+    lora_strength = 0.4,
+    high_noise_loras,
+    low_noise_loras,
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as LtxI2VParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  if (!image || typeof image !== 'string') {
+    throw new Error('image is required and must be a string URL, local file path, base64 string, or dream UUID');
+  }
+
+  const resolvedImage = await processImageForEndpoint(image, String(job.id));
+
+  // Build LoRA config for Power Lora Loader — supports single lora param or high_noise_loras array
+  let loraConfig: { on: boolean; lora: string; strength: number } | undefined;
+  if (high_noise_loras && Array.isArray(high_noise_loras)) {
+    const valid = high_noise_loras.filter((l) => l && l.path && l.path.trim() !== '');
+    if (valid.length > 0) {
+      loraConfig = { on: true, lora: valid[0].path, strength: valid[0].scale };
+    }
+  }
+  if (!loraConfig && lora) {
+    loraConfig = { on: true, lora, strength: lora_strength };
+  }
+
+  let lowNoiseLoraConfig: { on: boolean; lora: string; strength: number } | undefined;
+  if (low_noise_loras && Array.isArray(low_noise_loras)) {
+    const valid = low_noise_loras.filter((l) => l && l.path && l.path.trim() !== '');
+    if (valid.length > 0) {
+      lowNoiseLoraConfig = { on: true, lora: valid[0].path, strength: valid[0].scale };
+    }
+  }
+
+  // Compute frame count from duration: 1 + 8 * round(fps * duration / 8)
+  const fps = 24;
+  const frameCount = 1 + 8 * Math.round((fps * duration) / 8);
+  const noiseSeed = seed === -1 ? Math.floor(Math.random() * 1_000_000) : seed;
+  const filenamePrefix = String(job.id);
+
+  const workflow = createLtxI2VWorkflow({
+    prompt,
+    negative_prompt,
+    frameCount,
+    fps,
+    noiseSeed,
+    loraConfig,
+    lowNoiseLoraConfig,
+    filenamePrefix,
+  });
+
+  // Image is uploaded separately — rp_handler loads it via ComfyUI's upload API
+  const { id: runpodId } = await endpoints.ltxI2V.run({
+    input: {
+      workflow,
+      images: [
+        {
+          name: 'input.png',
+          image: resolvedImage,
+        },
+      ],
+    },
+  });
+
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.ltxI2V, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleLtxI2VJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
+export async function handleNvidiaVsrJob(job: Job): Promise<any> {
+  const {
+    video_url,
+    video_uuid,
+    upscale_factor = 2,
+    quality = 'HIGH',
+    dream_uuid,
+    auto_upload = true,
+  } = job.data as NvidiaVsrParams & { dream_uuid?: string; auto_upload?: boolean };
+
+  const input: Record<string, unknown> = {
+    upscale_factor,
+    quality,
+  };
+
+  const VALID_QUALITIES = ['LOW', 'MEDIUM', 'HIGH', 'ULTRA'] as const;
+  if (!VALID_QUALITIES.includes(quality as (typeof VALID_QUALITIES)[number])) {
+    throw new Error(`quality must be one of: ${VALID_QUALITIES.join(', ')}`);
+  }
+
+  const provided = [video_url, video_uuid].filter(Boolean);
+  if (provided.length === 0) {
+    throw new Error("Provide one of 'video_url' or 'video_uuid'");
+  }
+  if (provided.length > 1) {
+    throw new Error("Provide only one of 'video_url' or 'video_uuid'");
+  }
+
+  if (video_url) {
+    input.video_url = video_url;
+  } else if (video_uuid) {
+    input.video_uuid = video_uuid;
+  }
+
+  const { id: runpodId } = await endpoints.nvidiaVsr.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  } else if (dream_uuid) {
+    console.error(`[handleNvidiaVsrJob] Upload skipped for dream ${dream_uuid}:`, {
+      has_dream_uuid: !!dream_uuid,
+      auto_upload,
+      has_r2_url: !!result?.r2_url,
+      result_keys: result ? Object.keys(result) : 'no result',
+      result: result,
+    });
+  }
+
+  return result;
+}
+
 function createAnimatediffWorkflow(params: {
   seed: number;
   steps: number;
@@ -983,6 +1156,224 @@ function createAnimatediffWorkflow(params: {
         pingpong: false,
         save_output: true,
         images: ['10', 0],
+      },
+      class_type: 'VHS_VideoCombine',
+    },
+  };
+}
+
+function createLtxI2VWorkflow(params: {
+  prompt: string;
+  negative_prompt: string;
+  frameCount: number;
+  fps: number;
+  noiseSeed: number;
+  loraConfig?: { on: boolean; lora: string; strength: number };
+  lowNoiseLoraConfig?: { on: boolean; lora: string; strength: number };
+  filenamePrefix: string;
+}) {
+  const { prompt, negative_prompt, frameCount, fps, noiseSeed, loraConfig, lowNoiseLoraConfig, filenamePrefix } =
+    params;
+
+  // Node 1: Load distilled transformer
+  // Node 2: DualCLIPLoader (Gemma 3 + text projection)
+  // Node 3: Video VAE
+  // Node 4: Audio VAE (KJNodes)
+  // Node 5: Spatial upscaler
+  // Node 6: Power Lora Loader
+  // Node 10-12: Text encoding + conditioning
+  // Node 20-21: Image loading + preprocess
+  // Node 30-33: Latent setup (video + audio)
+  // Node 40-45: Pass 1 (8 steps, LCM, LTXVScheduler)
+  // Node 50-52: Spatial upscale + re-inject image + recombine audio
+  // Node 60-65: Pass 2 (3 steps, LCM, ManualSigmas)
+  // Node 70-71: Decode (video tiled + audio)
+  // Node 80: Output (VHS_VideoCombine)
+
+  const loraNode: Record<string, unknown> = {
+    inputs: {
+      model: ['1', 0],
+    },
+    class_type: 'Power Lora Loader (rgthree)',
+  };
+  if (loraConfig) {
+    (loraNode.inputs as Record<string, unknown>).lora_01 = loraConfig;
+  }
+  if (lowNoiseLoraConfig) {
+    (loraNode.inputs as Record<string, unknown>).lora_02 = lowNoiseLoraConfig;
+  }
+
+  return {
+    // ── Model Loading ──
+    '1': {
+      inputs: {
+        unet_name: 'ltx-2.3-22b-distilled_transformer_only_fp8_scaled.safetensors',
+        weight_dtype: 'default',
+      },
+      class_type: 'UNETLoader',
+    },
+    '2': {
+      inputs: {
+        clip_name1: 'gemma_3_12B_it_fpmixed.safetensors',
+        clip_name2: 'ltx-2.3_text_projection_bf16.safetensors',
+        type: 'ltx',
+      },
+      class_type: 'DualCLIPLoader',
+    },
+    '3': {
+      inputs: { vae_name: 'LTX23_video_vae_bf16.safetensors' },
+      class_type: 'VAELoader',
+    },
+    '4': {
+      inputs: { vae_name: 'LTX23_audio_vae_bf16.safetensors' },
+      class_type: 'VAELoaderKJ',
+    },
+    '5': {
+      inputs: { upscale_model_name: 'ltx-2.3-spatial-upscaler-x2-1.0.safetensors' },
+      class_type: 'LatentUpscaleModelLoader',
+    },
+    '6': loraNode,
+
+    // ── Text Encoding ──
+    '10': {
+      inputs: { text: prompt, clip: ['2', 0] },
+      class_type: 'CLIPTextEncode',
+    },
+    '11': {
+      inputs: { text: negative_prompt, clip: ['2', 0] },
+      class_type: 'CLIPTextEncode',
+    },
+    '12': {
+      inputs: { positive: ['10', 0], negative: ['11', 0], frame_rate: fps },
+      class_type: 'LTXVConditioning',
+    },
+
+    // ── Image Input ──
+    '20': {
+      inputs: { image: 'input.png', upload: 'image' },
+      class_type: 'LoadImage',
+    },
+    '21': {
+      inputs: { image: ['20', 0], num_frames: frameCount },
+      class_type: 'LTXVPreprocess',
+    },
+
+    // ── Latent Setup ──
+    '30': {
+      inputs: { width: 704, height: 512, length: frameCount, batch_size: 1 },
+      class_type: 'EmptyLTXVLatentVideo',
+    },
+    '31': {
+      inputs: { num_frames: frameCount, frame_rate: fps, batch_size: 1 },
+      class_type: 'LTXVEmptyLatentAudio',
+    },
+    '32': {
+      inputs: { latent: ['30', 0], ref_image: ['21', 0], bypass: false },
+      class_type: 'LTXVImgToVideoInplace',
+    },
+    '33': {
+      inputs: { samples_video: ['32', 0], samples_audio: ['31', 0] },
+      class_type: 'LTXVConcatAVLatent',
+    },
+
+    // ── Pass 1: Low-res (8 steps, LCM, LTXVScheduler) ──
+    '40': {
+      inputs: { steps: 8, max_shift: 2.05, min_shift: 0.95, reverse: true, base_shift: 0.1 },
+      class_type: 'LTXVScheduler',
+    },
+    '41': {
+      inputs: { sampler_name: 'lcm' },
+      class_type: 'KSamplerSelect',
+    },
+    '42': {
+      inputs: { noise_seed: noiseSeed },
+      class_type: 'RandomNoise',
+    },
+    '43': {
+      inputs: { model: ['6', 0], positive: ['12', 0], negative: ['12', 1], cfg: 1.0 },
+      class_type: 'CFGGuider',
+    },
+    '44': {
+      inputs: {
+        noise: ['42', 0],
+        guider: ['43', 0],
+        sampler: ['41', 0],
+        sigmas: ['40', 0],
+        latent_image: ['33', 0],
+      },
+      class_type: 'SamplerCustomAdvanced',
+    },
+    '45': {
+      inputs: { samples: ['44', 0] },
+      class_type: 'LTXVSeparateAVLatent',
+    },
+
+    // ── Spatial Upscale + Pass 2 ──
+    '50': {
+      inputs: { samples: ['45', 0], upscale_model: ['5', 0], vae: ['3', 0] },
+      class_type: 'LTXVLatentUpsampler',
+    },
+    '51': {
+      inputs: { latent: ['50', 0], ref_image: ['21', 0], bypass: false },
+      class_type: 'LTXVImgToVideoInplace',
+    },
+    '52': {
+      inputs: { samples_video: ['51', 0], samples_audio: ['45', 1] },
+      class_type: 'LTXVConcatAVLatent',
+    },
+    '60': {
+      inputs: { floats: '0.909375, 0.725, 0.421875, 0.0' },
+      class_type: 'ManualSigmas',
+    },
+    '61': {
+      inputs: { sampler_name: 'lcm' },
+      class_type: 'KSamplerSelect',
+    },
+    '62': {
+      inputs: { noise_seed: noiseSeed + 377 },
+      class_type: 'RandomNoise',
+    },
+    '63': {
+      inputs: { model: ['6', 0], positive: ['12', 0], negative: ['12', 1], cfg: 1.0 },
+      class_type: 'CFGGuider',
+    },
+    '64': {
+      inputs: {
+        noise: ['62', 0],
+        guider: ['63', 0],
+        sampler: ['61', 0],
+        sigmas: ['60', 0],
+        latent_image: ['52', 0],
+      },
+      class_type: 'SamplerCustomAdvanced',
+    },
+    '65': {
+      inputs: { samples: ['64', 0] },
+      class_type: 'LTXVSeparateAVLatent',
+    },
+
+    // ── Decode + Output ──
+    '70': {
+      inputs: { tile_size: 512, overlap: 64, samples: ['65', 0], vae: ['3', 0] },
+      class_type: 'VAEDecodeTiled',
+    },
+    '71': {
+      inputs: { samples: ['65', 1], vae: ['4', 0] },
+      class_type: 'LTXVAudioVAEDecode',
+    },
+    '80': {
+      inputs: {
+        frame_rate: fps,
+        loop_count: 0,
+        filename_prefix: filenamePrefix,
+        format: 'video/h264-mp4',
+        pix_fmt: 'yuv420p',
+        crf: 19,
+        save_metadata: true,
+        pingpong: false,
+        save_output: true,
+        images: ['70', 0],
+        audio: ['71', 0],
       },
       class_type: 'VHS_VideoCombine',
     },
