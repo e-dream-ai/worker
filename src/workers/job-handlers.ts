@@ -66,7 +66,7 @@ interface Wan22I2VLoraParams {
 
 interface LtxI2VParams {
   prompt: string;
-  image: string;
+  source_dream_uuid: string;
   negative_prompt?: string;
   duration?: number;
   seed?: number;
@@ -867,7 +867,7 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
 export async function handleLtxI2VJob(job: Job): Promise<any> {
   const {
     prompt,
-    image,
+    source_dream_uuid: image,
     negative_prompt = 'worst quality, blurry, distorted, watermark, text, low quality',
     duration = 2,
     seed = -1,
@@ -884,7 +884,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
   }
 
   if (!image || typeof image !== 'string') {
-    throw new Error('image is required and must be a string URL, local file path, base64 string, or dream UUID');
+    throw new Error('source_dream_uuid is required and must be a URL, local file path, base64 string, or dream UUID');
   }
 
   const resolvedImage = await processImageAsBase64ForComfyUI(image, String(job.id));
