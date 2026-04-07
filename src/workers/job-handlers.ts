@@ -971,31 +971,33 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
     auto_upload = true,
   } = job.data as NvidiaVsrParams & { dream_uuid?: string; auto_upload?: boolean };
 
-  const input: Record<string, unknown> = {
-    upscale_factor,
-    quality,
-  };
-
   const VALID_QUALITIES = ['LOW', 'MEDIUM', 'HIGH', 'ULTRA'] as const;
   if (!VALID_QUALITIES.includes(quality as (typeof VALID_QUALITIES)[number])) {
     throw new Error(`quality must be one of: ${VALID_QUALITIES.join(', ')}`);
   }
 
-  const provided = [video_url, video_uuid].filter(Boolean);
-  if (provided.length === 0) {
+  const videoInput = video_url || video_uuid;
+  if (!videoInput) {
     throw new Error("Provide one of 'video_url' or 'video_uuid'");
   }
-  if (provided.length > 1) {
-    throw new Error("Provide only one of 'video_url' or 'video_uuid'");
-  }
 
-  if (video_url) {
-    input.video_url = video_url;
-  } else if (video_uuid) {
-    input.video_uuid = video_uuid;
-  }
+  const filenamePrefix = String(job.id);
+  const resolvedVideo = await processImageAsBase64ForComfyUI(videoInput, filenamePrefix);
 
-  const { id: runpodId } = await endpoints.nvidiaVsr.run({ input });
+  const workflow = {
+    '1': { inputs: { video: 'input.mp4', upload: 'input' }, class_type: 'LoadVideo' },
+    '2': { inputs: { video: ['1', 0] }, class_type: 'GetVideoComponents' },
+    '3': {
+      inputs: { images: ['2', 0], scale_mode: 'scale by multiplier', scale_multiplier: upscale_factor, quality },
+      class_type: 'RTXVideoSuperResolution',
+    },
+    '4': { inputs: { frame_rate: ['2', 2], images: ['3', 0], audio: ['2', 1] }, class_type: 'CreateVideo' },
+    '5': { inputs: { filename_prefix: filenamePrefix, videos: ['4', 0] }, class_type: 'SaveVideo' },
+  };
+
+  const { id: runpodId } = await endpoints.nvidiaVsr.run({
+    input: { workflow, images: [{ name: 'input.mp4', image: resolvedVideo }] },
+  });
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
 
