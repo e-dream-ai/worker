@@ -568,6 +568,33 @@ function isUuid(str: string): boolean {
   return uuidRegex.test(str);
 }
 
+async function resolveUrlFromDreamUuid(dreamUuid: string, expectedMediaType?: string): Promise<string> {
+  try {
+    const dream = await videoServiceClient.getDreamInfo(dreamUuid);
+
+    if (expectedMediaType && dream.mediaType !== expectedMediaType) {
+      throw new Error(`Dream ${dreamUuid} is not a ${expectedMediaType} dream (mediaType: ${dream.mediaType})`);
+    }
+
+    const imageUrl = dream.video || dream.original_video;
+
+    if (!imageUrl) {
+      throw new Error(`Dream ${dreamUuid} does not have a URL (video or original_video)`);
+    }
+
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+      return `https://${imageUrl}`;
+    }
+
+    return imageUrl;
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      throw new Error(`Dream ${dreamUuid} not found`);
+    }
+    throw new Error(`Failed to resolve URL from dream UUID ${dreamUuid}: ${error.message || error}`);
+  }
+}
+
 async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
   try {
     const dream = await videoServiceClient.getDreamInfo(dreamUuid);
@@ -632,21 +659,28 @@ async function processImageForEndpoint(imageInput: string, jobId: string): Promi
   }
 }
 
-async function processImageAsBase64ForComfyUI(imageInput: string, jobId: string): Promise<string> {
-  const resolved = await processImageForEndpoint(imageInput, jobId);
-
-  const isUrl = resolved.startsWith('http://') || resolved.startsWith('https://');
-  if (!isUrl) {
-    return resolved; // already base64
-  }
-
+async function fetchUrlAsBase64(url: string): Promise<string> {
   const { fetch } = await import('undici');
-  const response = await fetch(resolved);
+  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to download image from ${resolved}: ${response.status}`);
+    throw new Error(`Failed to download from ${url}: ${response.status}`);
   }
   const buffer = Buffer.from(await response.arrayBuffer());
   return buffer.toString('base64');
+}
+
+async function processImageAsBase64ForComfyUI(imageInput: string, jobId: string): Promise<string> {
+  const resolved = await processImageForEndpoint(imageInput, jobId);
+  const isUrl = resolved.startsWith('http://') || resolved.startsWith('https://');
+  return isUrl ? fetchUrlAsBase64(resolved) : resolved;
+}
+
+async function processVideoAsBase64ForComfyUI(videoInput: string): Promise<string> {
+  const url =
+    videoInput.startsWith('http://') || videoInput.startsWith('https://')
+      ? videoInput
+      : await resolveUrlFromDreamUuid(videoInput);
+  return fetchUrlAsBase64(url);
 }
 
 export async function handleWanI2VLoraJob(job: Job): Promise<any> {
@@ -976,13 +1010,12 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
     throw new Error(`quality must be one of: ${VALID_QUALITIES.join(', ')}`);
   }
 
-  const videoInput = video_url || video_uuid;
-  if (!videoInput) {
+  if (!video_url && !video_uuid) {
     throw new Error("Provide one of 'video_url' or 'video_uuid'");
   }
 
   const filenamePrefix = String(job.id);
-  const resolvedVideo = await processImageAsBase64ForComfyUI(videoInput, filenamePrefix);
+  const resolvedVideo = await processVideoAsBase64ForComfyUI(video_url || video_uuid!);
 
   const workflow = {
     '1': { inputs: { video: 'input.mp4', upload: 'input' }, class_type: 'LoadVideo' },
