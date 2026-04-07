@@ -1021,7 +1021,7 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
     '1': { inputs: { file: 'input.mp4' }, class_type: 'LoadVideo' },
     '2': { inputs: { video: ['1', 0] }, class_type: 'GetVideoComponents' },
     '3': {
-      inputs: { images: ['2', 0], resize_type: 'scale by multiplier', scale: upscale_factor, quality },
+      inputs: { images: ['2', 0], resize_type: 'scale by multiplier', 'resize_type.scale': upscale_factor, quality },
       class_type: 'RTXVideoSuperResolution',
     },
     '4': { inputs: { images: ['3', 0], fps: ['2', 2], audio: ['2', 1] }, class_type: 'CreateVideo' },
