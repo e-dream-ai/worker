@@ -1018,14 +1018,17 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
   const resolvedVideo = await processVideoAsBase64ForComfyUI(video_url || video_uuid!);
 
   const workflow = {
-    '1': { inputs: { video: 'input.mp4', upload: 'input' }, class_type: 'LoadVideo' },
+    '1': { inputs: { file: 'input.mp4' }, class_type: 'LoadVideo' },
     '2': { inputs: { video: ['1', 0] }, class_type: 'GetVideoComponents' },
     '3': {
-      inputs: { images: ['2', 0], scale_mode: 'scale by multiplier', scale_multiplier: upscale_factor, quality },
+      inputs: { images: ['2', 0], resize_type: 'scale by multiplier', scale: upscale_factor, quality },
       class_type: 'RTXVideoSuperResolution',
     },
-    '4': { inputs: { frame_rate: ['2', 2], images: ['3', 0], audio: ['2', 1] }, class_type: 'CreateVideo' },
-    '5': { inputs: { filename_prefix: filenamePrefix, videos: ['4', 0] }, class_type: 'SaveVideo' },
+    '4': { inputs: { images: ['3', 0], fps: ['2', 2], audio: ['2', 1] }, class_type: 'CreateVideo' },
+    '5': {
+      inputs: { video: ['4', 0], filename_prefix: filenamePrefix, format: 'auto', codec: 'auto' },
+      class_type: 'SaveVideo',
+    },
   };
 
   const { id: runpodId } = await endpoints.nvidiaVsr.run({
