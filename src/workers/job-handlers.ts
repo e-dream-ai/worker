@@ -675,14 +675,6 @@ async function processImageAsBase64ForComfyUI(imageInput: string, jobId: string)
   return isUrl ? fetchUrlAsBase64(resolved) : resolved;
 }
 
-async function processVideoAsBase64ForComfyUI(videoInput: string): Promise<string> {
-  const url =
-    videoInput.startsWith('http://') || videoInput.startsWith('https://')
-      ? videoInput
-      : await resolveUrlFromDreamUuid(videoInput);
-  return fetchUrlAsBase64(url);
-}
-
 export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const {
     prompt,
@@ -960,7 +952,6 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     filenamePrefix,
   });
 
-  // Image is uploaded separately — rp_handler loads it via ComfyUI's upload API
   const { id: runpodId } = await endpoints.ltxI2V.run({
     input: {
       workflow,
@@ -1015,7 +1006,10 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
   }
 
   const filenamePrefix = String(job.id);
-  const resolvedVideo = await processVideoAsBase64ForComfyUI(video_url || video_uuid!);
+  const resolvedUrl =
+    video_url && (video_url.startsWith('http://') || video_url.startsWith('https://'))
+      ? video_url
+      : await resolveUrlFromDreamUuid(video_url || video_uuid!);
 
   const workflow = {
     '1': { inputs: { file: 'input.mp4' }, class_type: 'LoadVideo' },
@@ -1032,7 +1026,7 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
   };
 
   const { id: runpodId } = await endpoints.nvidiaVsr.run({
-    input: { workflow, images: [{ name: 'input.mp4', image: resolvedVideo }] },
+    input: { workflow, files: [{ name: 'input.mp4', url: resolvedUrl }] },
   });
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
