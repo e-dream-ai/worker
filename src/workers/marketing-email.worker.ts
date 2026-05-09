@@ -1,4 +1,4 @@
-import { Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { request } from 'undici';
 import redisClient from '../shared/redis.js';
 import env from '../shared/env.js';
@@ -16,6 +16,17 @@ type StartMarketingWorkerOptions = {
   apiKey?: string;
 };
 
+const getRetryAfterMs = (retryAfterHeader: string | string[] | undefined): number => {
+  const retryAfter = Array.isArray(retryAfterHeader) ? retryAfterHeader[0] : retryAfterHeader;
+  const retryAfterSeconds = retryAfter ? Number(retryAfter) : NaN;
+
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Math.ceil(retryAfterSeconds * 1000);
+  }
+
+  return 5000;
+};
+
 export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): Worker => {
   const emailSecret = opts?.emailSecret ?? env.MARKETING_EMAIL_SECRET;
   const backendUrl = opts?.backendUrl ?? env.BACKEND_URL;
@@ -28,13 +39,14 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
     throw new Error('backend api key is required to send marketing emails');
   }
 
+  const rateLimitQueue = new Queue(env.MARKETING_QUEUE_NAME, { connection: redisClient });
   const worker = new Worker<MarketingJobData>(
     env.MARKETING_QUEUE_NAME,
     async (job) => {
       const { email, templateId, unsubscribeToken } = job.data;
       await job.log(`Starting send: email=${email} templateId=${templateId}`);
 
-      const { statusCode, body } = await request(`${backendUrl}/marketing/send-one`, {
+      const { statusCode, headers, body } = await request(`${backendUrl}/marketing/send-one`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,6 +63,15 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
       if (statusCode < 200 || statusCode >= 300) {
         const errorText = await body.text();
         await job.log(`Send failed: status=${statusCode} body=${errorText}`);
+        if (statusCode === 403) {
+          job.discard();
+        }
+        if (statusCode === 429) {
+          const retryAfterMs = getRetryAfterMs(headers['retry-after']);
+          await job.log(`Rate limited. Pausing queue for ${retryAfterMs}ms`);
+          await rateLimitQueue.rateLimit(retryAfterMs);
+          throw Worker.RateLimitError();
+        }
         throw new Error(`Backend send-one failed: ${statusCode} ${errorText}`);
       }
 
@@ -60,6 +81,10 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
     {
       connection: redisClient,
       concurrency: env.MARKETING_CONCURRENCY,
+      limiter: {
+        max: env.MARKETING_RATE_LIMIT_PER_SECOND,
+        duration: 1000,
+      },
       lockDuration: 60000,
       stalledInterval: 30000,
       maxStalledCount: 2,
@@ -91,6 +116,17 @@ export const startMarketingEmailWorker = (opts?: StartMarketingWorkerOptions): W
     console.error(`Marketing email worker error: ${error?.message || error}`);
   });
 
-  console.log(`Marketing email worker listening on ${env.MARKETING_QUEUE_NAME}`);
+  const closeWorker = worker.close.bind(worker);
+  worker.close = async (force?: boolean) => {
+    try {
+      await closeWorker(force);
+    } finally {
+      await rateLimitQueue.close();
+    }
+  };
+
+  console.log(
+    `Marketing email worker listening on ${env.MARKETING_QUEUE_NAME} at ${env.MARKETING_RATE_LIMIT_PER_SECOND}/sec`
+  );
   return worker;
 };
