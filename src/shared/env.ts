@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { bool, cleanEnv, port, str } from 'envalid';
+import { bool, cleanEnv, num, port, str } from 'envalid';
 
 export const env = cleanEnv(process.env, {
   NODE_ENV: str({ choices: ['development', 'test', 'production', 'stage'], default: 'development' }),
@@ -41,7 +41,8 @@ export const env = cleanEnv(process.env, {
   BACKEND_API_KEY: str({ default: '' }),
   MARKETING_EMAIL_SECRET: str({ default: '' }),
   MARKETING_QUEUE_NAME: str({ default: 'marketing-email' }),
-  MARKETING_CONCURRENCY: port({ default: 50 }),
+  MARKETING_CONCURRENCY: port({ default: 10 }),
+  MARKETING_RATE_LIMIT_PER_SECOND: num({ default: 6 }),
 
   ADMIN_PASS: str({ default: '' }),
 });

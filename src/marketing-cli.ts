@@ -13,6 +13,13 @@ program
   .requiredOption('--template-id <id>', 'Resend template ID')
   .option('--dry-run', 'Dry run only (no enqueue)', false)
   .option('--email <email>', 'Target a specific user email')
+  .option(
+    '--email-prefix <prefix>',
+    'Target users whose email starts with this prefix. Can be repeated.',
+    (value, previous: string[] = []) => [...previous, value],
+    []
+  )
+  .option('--max-last-client-version <version>', 'Only target users with this client version or older')
   .option('--user-id <id>', 'Target a specific user ID', (value) => Number(value))
   .option('--limit <n>', 'Limit number of users', (value) => Number(value))
   .option('--offset <n>', 'Offset for users', (value) => Number(value));
@@ -53,10 +60,15 @@ const run = async () => {
   const limit = parseOptionalNumber(opts.limit, 'limit');
   const offset = parseOptionalNumber(opts.offset, 'offset');
   const userId = parseOptionalNumber(opts.userId, 'user-id');
-  if (opts.email && userId !== undefined) {
-    throw new Error('Use either --email or --user-id, not both');
+  const emailPrefixes = Array.isArray(opts.emailPrefix)
+    ? opts.emailPrefix.map((prefix) => String(prefix).trim()).filter(Boolean)
+    : [];
+  if ([opts.email, userId !== undefined, emailPrefixes.length > 0].filter(Boolean).length > 1) {
+    throw new Error('Use only one target filter: --email, --user-id, or --email-prefix');
   }
   if (opts.email) body.email = String(opts.email);
+  if (emailPrefixes.length) body.emailPrefixes = emailPrefixes;
+  if (opts.maxLastClientVersion) body.maxLastClientVersion = String(opts.maxLastClientVersion);
   if (userId !== undefined) body.userId = userId;
   if (limit !== undefined) body.limit = limit;
   if (offset !== undefined) body.offset = offset;
