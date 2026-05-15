@@ -67,6 +67,7 @@ interface Wan22I2VLoraParams {
 interface LtxI2VParams {
   prompt: string;
   source_dream_uuid: string;
+  end_source_uuid?: string;
   negative_prompt?: string;
   duration?: number;
   seed?: number;
@@ -894,10 +895,11 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
   const {
     prompt,
     source_dream_uuid: image,
+    end_source_uuid: endImage,
     negative_prompt = 'worst quality, blurry, distorted, watermark, text, low quality',
     duration = 2,
     seed = -1,
-    lora = 'ltx-2-19b-lora-camera-control-static.safetensors',
+    lora,
     lora_strength = 0.4,
     high_noise_loras,
     low_noise_loras,
@@ -913,7 +915,10 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     throw new Error('source_dream_uuid is required and must be a URL, local file path, base64 string, or dream UUID');
   }
 
-  const resolvedImage = await processImageAsBase64ForComfyUI(image, String(job.id));
+  const [resolvedImage, resolvedEndImage] = await Promise.all([
+    processImageAsBase64ForComfyUI(image, String(job.id)),
+    endImage ? processImageAsBase64ForComfyUI(endImage, String(job.id)) : Promise.resolve(undefined),
+  ]);
 
   // Build LoRA config for Power Lora Loader — supports single lora param or high_noise_loras array
   let loraConfig: { on: boolean; lora: string; strength: number } | undefined;
@@ -950,18 +955,16 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     loraConfig,
     lowNoiseLoraConfig,
     filenamePrefix,
+    hasEndFrame: !!resolvedEndImage,
   });
 
+  const images: { name: string; image: string }[] = [{ name: 'input.png', image: resolvedImage }];
+  if (resolvedEndImage) {
+    images.push({ name: 'end_frame.png', image: resolvedEndImage });
+  }
+
   const { id: runpodId } = await endpoints.ltxI2V.run({
-    input: {
-      workflow,
-      images: [
-        {
-          name: 'input.png',
-          image: resolvedImage,
-        },
-      ],
-    },
+    input: { workflow, images },
   });
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
@@ -1221,9 +1224,19 @@ function createLtxI2VWorkflow(params: {
   loraConfig?: { on: boolean; lora: string; strength: number };
   lowNoiseLoraConfig?: { on: boolean; lora: string; strength: number };
   filenamePrefix: string;
+  hasEndFrame?: boolean;
 }) {
-  const { prompt, negative_prompt, frameCount, fps, noiseSeed, loraConfig, lowNoiseLoraConfig, filenamePrefix } =
-    params;
+  const {
+    prompt,
+    negative_prompt,
+    frameCount,
+    fps,
+    noiseSeed,
+    loraConfig,
+    lowNoiseLoraConfig,
+    filenamePrefix,
+    hasEndFrame,
+  } = params;
 
   // Node 1: Load distilled transformer
   // Node 2: DualCLIPLoader (Gemma 3 + text projection)
@@ -1307,6 +1320,15 @@ function createLtxI2VWorkflow(params: {
       inputs: { image: ['20', 0], num_frames: frameCount, img_compression: 35 },
       class_type: 'LTXVPreprocess',
     },
+    // End frame (only present when hasEndFrame)
+    ...(hasEndFrame
+      ? {
+          '22': {
+            inputs: { image: 'end_frame.png', upload: 'image' },
+            class_type: 'LoadImage',
+          },
+        }
+      : {}),
 
     // ── Latent Setup ──
     '30': {
@@ -1321,8 +1343,27 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
+    ...(hasEndFrame
+      ? {
+          '34': {
+            inputs: {
+              positive: ['12', 0],
+              negative: ['12', 1],
+              vae: ['3', 0],
+              latent: ['32', 0],
+              image: ['22', 0],
+              frame_idx: -1,
+              strength: 1.0,
+            },
+            class_type: 'LTXVAddGuide',
+          },
+        }
+      : {}),
     '33': {
-      inputs: { video_latent: ['32', 0], audio_latent: ['31', 0] },
+      inputs: {
+        video_latent: hasEndFrame ? ['34', 2] : ['32', 0],
+        audio_latent: ['31', 0],
+      },
       class_type: 'LTXVConcatAVLatent',
     },
 
@@ -1340,7 +1381,12 @@ function createLtxI2VWorkflow(params: {
       class_type: 'RandomNoise',
     },
     '43': {
-      inputs: { model: ['6', 0], positive: ['12', 0], negative: ['12', 1], cfg: 1.0 },
+      inputs: {
+        model: ['6', 0],
+        positive: hasEndFrame ? ['34', 0] : ['12', 0],
+        negative: hasEndFrame ? ['34', 1] : ['12', 1],
+        cfg: 1.0,
+      },
       class_type: 'CFGGuider',
     },
     '44': {
@@ -1367,8 +1413,28 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['50', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
+    // End-frame guide for pass 2 — re-injects end image after upscale
+    ...(hasEndFrame
+      ? {
+          '53': {
+            inputs: {
+              positive: ['12', 0],
+              negative: ['12', 1],
+              vae: ['3', 0],
+              latent: ['51', 0],
+              image: ['22', 0],
+              frame_idx: -1,
+              strength: 1.0,
+            },
+            class_type: 'LTXVAddGuide',
+          },
+        }
+      : {}),
     '52': {
-      inputs: { video_latent: ['51', 0], audio_latent: ['45', 1] },
+      inputs: {
+        video_latent: hasEndFrame ? ['53', 2] : ['51', 0],
+        audio_latent: ['45', 1],
+      },
       class_type: 'LTXVConcatAVLatent',
     },
     '60': {
@@ -1384,7 +1450,12 @@ function createLtxI2VWorkflow(params: {
       class_type: 'RandomNoise',
     },
     '63': {
-      inputs: { model: ['6', 0], positive: ['12', 0], negative: ['12', 1], cfg: 1.0 },
+      inputs: {
+        model: ['6', 0],
+        positive: hasEndFrame ? ['53', 0] : ['12', 0],
+        negative: hasEndFrame ? ['53', 1] : ['12', 1],
+        cfg: 1.0,
+      },
       class_type: 'CFGGuider',
     },
     '64': {
