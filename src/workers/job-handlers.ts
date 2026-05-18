@@ -130,7 +130,7 @@ export async function handleVideoIngestJob(job: Job): Promise<any> {
     input.extension = extension;
   }
 
-  const { id: runpodId } = await endpoints.videoingest.run({ input });
+  const { id: runpodId } = await endpoints.videoingest.run({ input }, 30000);
   await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.videoingest, runpodId, job);
 }
@@ -139,51 +139,54 @@ export async function handleImageJob(job: Job): Promise<any> {
   const { prompt = 'A walk in the park', seed = 1337, steps = 20, width = 512, height = 512 } = job.data;
   const filenamePrefix = String(job.id);
 
-  const { id: runpodId } = await endpoints.animatediff.run({
-    input: {
-      workflow: {
-        '3': {
-          inputs: {
-            seed,
-            steps,
-            cfg: 8,
-            sampler_name: 'euler',
-            scheduler: 'normal',
-            denoise: 1,
-            model: ['4', 0],
-            positive: ['6', 0],
-            negative: ['7', 0],
-            latent_image: ['5', 0],
+  const { id: runpodId } = await endpoints.animatediff.run(
+    {
+      input: {
+        workflow: {
+          '3': {
+            inputs: {
+              seed,
+              steps,
+              cfg: 8,
+              sampler_name: 'euler',
+              scheduler: 'normal',
+              denoise: 1,
+              model: ['4', 0],
+              positive: ['6', 0],
+              negative: ['7', 0],
+              latent_image: ['5', 0],
+            },
+            class_type: 'KSampler',
           },
-          class_type: 'KSampler',
-        },
-        '4': {
-          inputs: { ckpt_name: 'sd_xl_base_1.0.safetensors' },
-          class_type: 'CheckpointLoaderSimple',
-        },
-        '5': {
-          inputs: { width, height, batch_size: 1 },
-          class_type: 'EmptyLatentImage',
-        },
-        '6': {
-          inputs: { text: prompt, clip: ['4', 1] },
-          class_type: 'CLIPTextEncode',
-        },
-        '7': {
-          inputs: { text: 'text, watermark', clip: ['4', 1] },
-          class_type: 'CLIPTextEncode',
-        },
-        '8': {
-          inputs: { samples: ['3', 0], vae: ['4', 2] },
-          class_type: 'VAEDecode',
-        },
-        '9': {
-          inputs: { filename_prefix: filenamePrefix, images: ['8', 0] },
-          class_type: 'SaveImage',
+          '4': {
+            inputs: { ckpt_name: 'sd_xl_base_1.0.safetensors' },
+            class_type: 'CheckpointLoaderSimple',
+          },
+          '5': {
+            inputs: { width, height, batch_size: 1 },
+            class_type: 'EmptyLatentImage',
+          },
+          '6': {
+            inputs: { text: prompt, clip: ['4', 1] },
+            class_type: 'CLIPTextEncode',
+          },
+          '7': {
+            inputs: { text: 'text, watermark', clip: ['4', 1] },
+            class_type: 'CLIPTextEncode',
+          },
+          '8': {
+            inputs: { samples: ['3', 0], vae: ['4', 2] },
+            class_type: 'VAEDecode',
+          },
+          '9': {
+            inputs: { filename_prefix: filenamePrefix, images: ['8', 0] },
+            class_type: 'SaveImage',
+          },
         },
       },
     },
-  });
+    30000
+  );
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
@@ -213,23 +216,26 @@ export async function handleVideoJob(job: Job): Promise<any> {
   const prompt = promptsJson.substring(1, promptsJson.length - 1);
   const filenamePrefix = String(job.id);
 
-  const { id: runpodId } = await endpoints.animatediff.run({
-    input: {
-      workflow: createAnimatediffWorkflow({
-        seed,
-        steps,
-        width,
-        height,
-        prompt,
-        pre_text,
-        app_text,
-        frame_count,
-        frame_rate,
-        motion_scale,
-        filenamePrefix,
-      }),
+  const { id: runpodId } = await endpoints.animatediff.run(
+    {
+      input: {
+        workflow: createAnimatediffWorkflow({
+          seed,
+          steps,
+          width,
+          height,
+          prompt,
+          pre_text,
+          app_text,
+          frame_count,
+          frame_rate,
+          motion_scale,
+          filenamePrefix,
+        }),
+      },
     },
-  });
+    30000
+  );
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
@@ -271,20 +277,23 @@ export async function handleHunyuanVideoJob(job: Job): Promise<any> {
 
   const filenamePrefix = String(job.id);
 
-  const { id: runpodId } = await endpoints.hunyuan.run({
-    input: {
-      workflow: createHunyuanWorkflow({
-        width,
-        height,
-        frame_count,
-        steps,
-        seed,
-        prompt,
-        frame_rate,
-        filenamePrefix,
-      }),
+  const { id: runpodId } = await endpoints.hunyuan.run(
+    {
+      input: {
+        workflow: createHunyuanWorkflow({
+          width,
+          height,
+          frame_count,
+          steps,
+          seed,
+          prompt,
+          frame_rate,
+          filenamePrefix,
+        }),
+      },
     },
-  });
+    30000
+  );
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.hunyuan, runpodId, job);
@@ -303,18 +312,21 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
     }
   }
 
-  const { id: runpodId } = await endpoints.deforum.run({
-    input: {
-      settings: {
-        batch_name: String(job.id),
-        prompts,
-        ...otherParams,
-        output_name: undefined,
-        input_file_path: undefined,
-        custom_output_path: undefined,
+  const { id: runpodId } = await endpoints.deforum.run(
+    {
+      input: {
+        settings: {
+          batch_name: String(job.id),
+          prompts,
+          ...otherParams,
+          output_name: undefined,
+          input_file_path: undefined,
+          custom_output_path: undefined,
+        },
       },
     },
-  });
+    30000
+  );
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.deforum, runpodId, job);
@@ -371,7 +383,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     input.video_path = video_path;
   }
 
-  const { id: runpodId } = await endpoints.uprez.run({ input });
+  const { id: runpodId } = await endpoints.uprez.run({ input }, 30000);
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
 
@@ -963,9 +975,12 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     images.push({ name: 'end_frame.png', image: resolvedEndImage });
   }
 
-  const { id: runpodId } = await endpoints.ltxI2V.run({
-    input: { workflow, images },
-  });
+  const { id: runpodId } = await endpoints.ltxI2V.run(
+    {
+      input: { workflow, images },
+    },
+    30000
+  );
 
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.ltxI2V, runpodId, job);
@@ -1028,9 +1043,12 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
     },
   };
 
-  const { id: runpodId } = await endpoints.nvidiaVsr.run({
-    input: { workflow, files: [{ name: 'input.mp4', url: resolvedUrl }] },
-  });
+  const { id: runpodId } = await endpoints.nvidiaVsr.run(
+    {
+      input: { workflow, files: [{ name: 'input.mp4', url: resolvedUrl }] },
+    },
+    30000
+  );
   await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
 
