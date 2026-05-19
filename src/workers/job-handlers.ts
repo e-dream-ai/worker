@@ -1361,25 +1361,23 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
-    ...(hasEndFrame
-      ? {
-          '34': {
-            inputs: {
-              positive: ['12', 0],
-              negative: ['12', 1],
-              vae: ['3', 0],
-              latent: ['32', 0],
-              image: ['22', 0],
-              frame_idx: -1,
-              strength: 1.0,
-            },
-            class_type: 'LTXVAddGuide',
-          },
-        }
-      : {}),
+    // When no explicit end frame, guide at -12 (not -1) so the model has landing room — prevents the
+    // last-frame shaking artifact. Community-validated fix: frame_idx:-12, strength:0.7.
+    '34': {
+      inputs: {
+        positive: ['12', 0],
+        negative: ['12', 1],
+        vae: ['3', 0],
+        latent: ['32', 0],
+        image: hasEndFrame ? ['22', 0] : ['20', 0],
+        frame_idx: hasEndFrame ? -1 : -12,
+        strength: hasEndFrame ? 1.0 : 0.7,
+      },
+      class_type: 'LTXVAddGuide',
+    },
     '33': {
       inputs: {
-        video_latent: hasEndFrame ? ['34', 2] : ['32', 0],
+        video_latent: ['34', 2],
         audio_latent: ['31', 0],
       },
       class_type: 'LTXVConcatAVLatent',
@@ -1401,8 +1399,8 @@ function createLtxI2VWorkflow(params: {
     '43': {
       inputs: {
         model: ['6', 0],
-        positive: hasEndFrame ? ['34', 0] : ['12', 0],
-        negative: hasEndFrame ? ['34', 1] : ['12', 1],
+        positive: ['34', 0],
+        negative: ['34', 1],
         cfg: 1.0,
       },
       class_type: 'CFGGuider',
@@ -1431,26 +1429,21 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['50', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
-    // End-frame guide for pass 2 — re-injects end image after upscale
-    ...(hasEndFrame
-      ? {
-          '53': {
-            inputs: {
-              positive: ['12', 0],
-              negative: ['12', 1],
-              vae: ['3', 0],
-              latent: ['51', 0],
-              image: ['22', 0],
-              frame_idx: -1,
-              strength: 1.0,
-            },
-            class_type: 'LTXVAddGuide',
-          },
-        }
-      : {}),
+    '53': {
+      inputs: {
+        positive: ['12', 0],
+        negative: ['12', 1],
+        vae: ['3', 0],
+        latent: ['51', 0],
+        image: hasEndFrame ? ['22', 0] : ['20', 0],
+        frame_idx: hasEndFrame ? -1 : -12,
+        strength: hasEndFrame ? 1.0 : 0.7,
+      },
+      class_type: 'LTXVAddGuide',
+    },
     '52': {
       inputs: {
-        video_latent: hasEndFrame ? ['53', 2] : ['51', 0],
+        video_latent: ['53', 2],
         audio_latent: ['45', 1],
       },
       class_type: 'LTXVConcatAVLatent',
@@ -1470,8 +1463,8 @@ function createLtxI2VWorkflow(params: {
     '63': {
       inputs: {
         model: ['6', 0],
-        positive: hasEndFrame ? ['53', 0] : ['12', 0],
-        negative: hasEndFrame ? ['53', 1] : ['12', 1],
+        positive: ['53', 0],
+        negative: ['53', 1],
         cfg: 1.0,
       },
       class_type: 'CFGGuider',
