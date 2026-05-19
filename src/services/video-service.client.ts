@@ -102,6 +102,7 @@ export class VideoServiceClient {
     const response = await axios.get(`${this.backendUrl}/dream/${dreamUuid}`, {
       headers: {
         Authorization: `Api-Key ${this.backendApiKey}`,
+        'User-Agent': 'EdreamSDK',
       },
     });
     return response.data.data.dream;
