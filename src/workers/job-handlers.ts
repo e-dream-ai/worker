@@ -1393,8 +1393,16 @@ function createLtxI2VWorkflow(params: {
       inputs: { av_latent: ['44', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
+    '46': {
+      inputs: {
+        positive: ['34', 0],
+        negative: ['34', 1],
+        latent: ['45', 0],
+      },
+      class_type: 'LTXVCropGuides',
+    },
     '50': {
-      inputs: { samples: ['45', 0], upscale_model: ['5', 0], vae: ['3', 0] },
+      inputs: { samples: ['46', 2], upscale_model: ['5', 0], vae: ['3', 0] },
       class_type: 'LTXVLatentUpsampler',
     },
     '51': {
@@ -1455,13 +1463,21 @@ function createLtxI2VWorkflow(params: {
       inputs: { av_latent: ['64', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
+    '66': {
+      inputs: {
+        positive: ['53', 0],
+        negative: ['53', 1],
+        latent: ['65', 0],
+      },
+      class_type: 'LTXVCropGuides',
+    },
     '70': {
       inputs: {
         tile_size: 512,
         overlap: 64,
         temporal_size: 64,
         temporal_overlap: 8,
-        samples: ['65', 0],
+        samples: ['66', 2],
         vae: ['3', 0],
       },
       class_type: 'VAEDecodeTiled',
