@@ -1294,7 +1294,7 @@ function createLtxI2VWorkflow(params: {
       class_type: 'VAELoaderKJ',
     },
     '5': {
-      inputs: { model_name: 'ltx-2.3-spatial-upscaler-x2-1.0.safetensors' },
+      inputs: { model_name: 'ltx-2.3-spatial-upscaler-x2-1.1.safetensors' },
       class_type: 'LatentUpscaleModelLoader',
     },
     '6': loraNode,
@@ -1345,7 +1345,7 @@ function createLtxI2VWorkflow(params: {
         vae: ['3', 0],
         latent: ['32', 0],
         image: hasEndFrame ? ['22', 0] : ['20', 0],
-        frame_idx: -12,
+        frame_idx: -8,
         strength: hasEndFrame ? 1.0 : 0.7,
       },
       class_type: 'LTXVAddGuide',
@@ -1393,8 +1393,16 @@ function createLtxI2VWorkflow(params: {
       inputs: { av_latent: ['44', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
+    '46': {
+      inputs: {
+        positive: ['34', 0],
+        negative: ['34', 1],
+        latent: ['45', 0],
+      },
+      class_type: 'LTXVCropGuides',
+    },
     '50': {
-      inputs: { samples: ['45', 0], upscale_model: ['5', 0], vae: ['3', 0] },
+      inputs: { samples: ['46', 2], upscale_model: ['5', 0], vae: ['3', 0] },
       class_type: 'LTXVLatentUpsampler',
     },
     '51': {
@@ -1408,7 +1416,7 @@ function createLtxI2VWorkflow(params: {
         vae: ['3', 0],
         latent: ['51', 0],
         image: hasEndFrame ? ['22', 0] : ['20', 0],
-        frame_idx: -12,
+        frame_idx: -8,
         strength: hasEndFrame ? 1.0 : 0.7,
       },
       class_type: 'LTXVAddGuide',
@@ -1455,14 +1463,21 @@ function createLtxI2VWorkflow(params: {
       inputs: { av_latent: ['64', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
-
+    '66': {
+      inputs: {
+        positive: ['53', 0],
+        negative: ['53', 1],
+        latent: ['65', 0],
+      },
+      class_type: 'LTXVCropGuides',
+    },
     '70': {
       inputs: {
         tile_size: 512,
         overlap: 64,
-        temporal_size: 64,
+        temporal_size: 128,
         temporal_overlap: 8,
-        samples: ['65', 0],
+        samples: ['66', 2],
         vae: ['3', 0],
       },
       class_type: 'VAEDecodeTiled',
