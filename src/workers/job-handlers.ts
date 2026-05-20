@@ -1475,7 +1475,7 @@ function createLtxI2VWorkflow(params: {
       inputs: {
         tile_size: 512,
         overlap: 64,
-        temporal_size: 64,
+        temporal_size: 128,
         temporal_overlap: 8,
         samples: ['66', 2],
         vae: ['3', 0],
