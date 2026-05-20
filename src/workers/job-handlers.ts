@@ -1338,21 +1338,25 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
-    '34': {
-      inputs: {
-        positive: ['12', 0],
-        negative: ['12', 1],
-        vae: ['3', 0],
-        latent: ['32', 0],
-        image: hasEndFrame ? ['22', 0] : ['20', 0],
-        frame_idx: -8,
-        strength: hasEndFrame ? 1.0 : 0.7,
-      },
-      class_type: 'LTXVAddGuide',
-    },
+    ...(hasEndFrame
+      ? {
+          '34': {
+            inputs: {
+              positive: ['12', 0],
+              negative: ['12', 1],
+              vae: ['3', 0],
+              latent: ['32', 0],
+              image: ['22', 0],
+              frame_idx: -8,
+              strength: 1.0,
+            },
+            class_type: 'LTXVAddGuide',
+          },
+        }
+      : {}),
     '33': {
       inputs: {
-        video_latent: ['34', 2],
+        video_latent: hasEndFrame ? ['34', 2] : ['32', 0],
         audio_latent: ['31', 0],
       },
       class_type: 'LTXVConcatAVLatent',
@@ -1373,8 +1377,8 @@ function createLtxI2VWorkflow(params: {
     '43': {
       inputs: {
         model: ['6', 0],
-        positive: ['34', 0],
-        negative: ['34', 1],
+        positive: hasEndFrame ? ['34', 0] : ['12', 0],
+        negative: hasEndFrame ? ['34', 1] : ['12', 1],
         cfg: 1.0,
       },
       class_type: 'CFGGuider',
@@ -1401,21 +1405,25 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['50', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
-    '53': {
-      inputs: {
-        positive: ['12', 0],
-        negative: ['12', 1],
-        vae: ['3', 0],
-        latent: ['51', 0],
-        image: hasEndFrame ? ['22', 0] : ['20', 0],
-        frame_idx: -8,
-        strength: hasEndFrame ? 1.0 : 0.7,
-      },
-      class_type: 'LTXVAddGuide',
-    },
+    ...(hasEndFrame
+      ? {
+          '53': {
+            inputs: {
+              positive: ['12', 0],
+              negative: ['12', 1],
+              vae: ['3', 0],
+              latent: ['51', 0],
+              image: ['22', 0],
+              frame_idx: -8,
+              strength: 1.0,
+            },
+            class_type: 'LTXVAddGuide',
+          },
+        }
+      : {}),
     '52': {
       inputs: {
-        video_latent: ['53', 2],
+        video_latent: hasEndFrame ? ['53', 2] : ['51', 0],
         audio_latent: ['45', 1],
       },
       class_type: 'LTXVConcatAVLatent',
@@ -1435,8 +1443,8 @@ function createLtxI2VWorkflow(params: {
     '63': {
       inputs: {
         model: ['6', 0],
-        positive: ['53', 0],
-        negative: ['53', 1],
+        positive: hasEndFrame ? ['53', 0] : ['12', 0],
+        negative: hasEndFrame ? ['53', 1] : ['12', 1],
         cfg: 1.0,
       },
       class_type: 'CFGGuider',
@@ -1455,29 +1463,33 @@ function createLtxI2VWorkflow(params: {
       inputs: { av_latent: ['64', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
-    '66': {
-      inputs: {
-        positive: ['53', 0],
-        negative: ['53', 1],
-        latent: ['65', 0],
-      },
-      class_type: 'LTXVCropGuides',
-    },
-    '67': {
-      inputs: {
-        positive: ['34', 0],
-        negative: ['34', 1],
-        latent: ['66', 2],
-      },
-      class_type: 'LTXVCropGuides',
-    },
+    ...(hasEndFrame
+      ? {
+          '66': {
+            inputs: {
+              positive: ['53', 0],
+              negative: ['53', 1],
+              latent: ['65', 0],
+            },
+            class_type: 'LTXVCropGuides',
+          },
+          '67': {
+            inputs: {
+              positive: ['34', 0],
+              negative: ['34', 1],
+              latent: ['66', 2],
+            },
+            class_type: 'LTXVCropGuides',
+          },
+        }
+      : {}),
     '70': {
       inputs: {
         tile_size: 512,
         overlap: 64,
         temporal_size: 64,
         temporal_overlap: 8,
-        samples: ['67', 2],
+        samples: hasEndFrame ? ['67', 2] : ['65', 0],
         vae: ['3', 0],
       },
       class_type: 'VAEDecodeTiled',
