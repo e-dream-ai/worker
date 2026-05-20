@@ -1256,21 +1256,6 @@ function createLtxI2VWorkflow(params: {
     hasEndFrame,
   } = params;
 
-  // Node 1: Load distilled transformer
-  // Node 2: DualCLIPLoader (Gemma 3 + text projection)
-  // Node 3: Video VAE
-  // Node 4: Audio VAE (KJNodes)
-  // Node 5: Spatial upscaler
-  // Node 6: Power Lora Loader
-  // Node 10-12: Text encoding + conditioning
-  // Node 20-21: Image loading + preprocess
-  // Node 30-33: Latent setup (video + audio)
-  // Node 40-45: Pass 1 (8 steps, LCM, LTXVScheduler)
-  // Node 50-52: Spatial upscale + re-inject image + recombine audio
-  // Node 60-65: Pass 2 (3 steps, LCM, ManualSigmas)
-  // Node 70-71: Decode (video tiled + audio)
-  // Node 80: Output (VHS_VideoCombine)
-
   const loraNode: Record<string, unknown> = {
     inputs: {
       model: ['1', 0],
@@ -1285,7 +1270,6 @@ function createLtxI2VWorkflow(params: {
   }
 
   return {
-    // ── Model Loading ──
     '1': {
       inputs: {
         unet_name: 'ltx-2.3-22b-distilled_transformer_only_fp8_scaled.safetensors',
@@ -1314,8 +1298,6 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LatentUpscaleModelLoader',
     },
     '6': loraNode,
-
-    // ── Text Encoding ──
     '10': {
       inputs: { text: prompt, clip: ['2', 0] },
       class_type: 'CLIPTextEncode',
@@ -1328,8 +1310,6 @@ function createLtxI2VWorkflow(params: {
       inputs: { positive: ['10', 0], negative: ['11', 0], frame_rate: fps },
       class_type: 'LTXVConditioning',
     },
-
-    // ── Image Input ──
     '20': {
       inputs: { image: 'input.png', upload: 'image' },
       class_type: 'LoadImage',
@@ -1338,7 +1318,6 @@ function createLtxI2VWorkflow(params: {
       inputs: { image: ['20', 0], num_frames: frameCount, img_compression: 35 },
       class_type: 'LTXVPreprocess',
     },
-    // End frame (only present when hasEndFrame)
     ...(hasEndFrame
       ? {
           '22': {
@@ -1347,8 +1326,6 @@ function createLtxI2VWorkflow(params: {
           },
         }
       : {}),
-
-    // ── Latent Setup ──
     '30': {
       inputs: { width: 704, height: 512, length: frameCount, batch_size: 1 },
       class_type: 'EmptyLTXVLatentVideo',
@@ -1361,8 +1338,6 @@ function createLtxI2VWorkflow(params: {
       inputs: { latent: ['30', 0], vae: ['3', 0], image: ['21', 0], strength: 1.0, bypass: false },
       class_type: 'LTXVImgToVideoInplace',
     },
-    // When no explicit end frame, guide at -12 (not -1) so the model has landing room — prevents the
-    // last-frame shaking artifact. Community-validated fix: frame_idx:-12, strength:0.7.
     '34': {
       inputs: {
         positive: ['12', 0],
@@ -1370,7 +1345,7 @@ function createLtxI2VWorkflow(params: {
         vae: ['3', 0],
         latent: ['32', 0],
         image: hasEndFrame ? ['22', 0] : ['20', 0],
-        frame_idx: hasEndFrame ? -1 : -12,
+        frame_idx: -12,
         strength: hasEndFrame ? 1.0 : 0.7,
       },
       class_type: 'LTXVAddGuide',
@@ -1383,7 +1358,6 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVConcatAVLatent',
     },
 
-    // ── Pass 1: Low-res (8 steps, LCM, LTXVScheduler) ──
     '40': {
       inputs: { steps: 8, max_shift: 2.05, base_shift: 0.95, stretch: true, terminal: 0.1 },
       class_type: 'LTXVScheduler',
@@ -1419,8 +1393,6 @@ function createLtxI2VWorkflow(params: {
       inputs: { av_latent: ['44', 0] },
       class_type: 'LTXVSeparateAVLatent',
     },
-
-    // ── Spatial Upscale + Pass 2 ──
     '50': {
       inputs: { samples: ['45', 0], upscale_model: ['5', 0], vae: ['3', 0] },
       class_type: 'LTXVLatentUpsampler',
@@ -1436,7 +1408,7 @@ function createLtxI2VWorkflow(params: {
         vae: ['3', 0],
         latent: ['51', 0],
         image: hasEndFrame ? ['22', 0] : ['20', 0],
-        frame_idx: hasEndFrame ? -1 : -12,
+        frame_idx: -12,
         strength: hasEndFrame ? 1.0 : 0.7,
       },
       class_type: 'LTXVAddGuide',
@@ -1484,7 +1456,6 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVSeparateAVLatent',
     },
 
-    // ── Decode + Output ──
     '70': {
       inputs: {
         tile_size: 512,
