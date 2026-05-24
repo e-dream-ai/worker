@@ -12,6 +12,7 @@ export const endpoints = {
   ltxI2V: runpod.endpoint(env.RUNPOD_LTX_ENDPOINT_ID),
   nvidiaVsr: runpod.endpoint(env.RUNPOD_NVIDIA_SR_ENDPOINT_ID),
   videoingest: runpod.endpoint(env.RUNPOD_VIDEOINGEST_ENDPOINT_ID),
+  discoDiffusion: runpod.endpoint(env.RUNPOD_DISCODIFFUSION_ENDPOINT_ID),
   wanT2V: new PublicEndpointService('wan-2-2-t2v-720'),
   wanI2V: new PublicEndpointService('wan-2-2-i2v-720'),
   wanI2VLora: new PublicEndpointService('wan-2-2-t2v-720-lora'),

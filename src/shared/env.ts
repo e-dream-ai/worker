@@ -22,6 +22,7 @@ export const env = cleanEnv(process.env, {
   RUNPOD_LTX_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_NVIDIA_SR_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_VIDEOINGEST_ENDPOINT_ID: str({ default: '' }),
+  RUNPOD_DISCODIFFUSION_ENDPOINT_ID: str({ default: '' }),
 
   /**
    * CLOUDFLARE R2

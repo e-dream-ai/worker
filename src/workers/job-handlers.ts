@@ -1598,3 +1598,15 @@ function createHunyuanWorkflow(params: {
     },
   };
 }
+
+export async function handleDiscoDiffusionJob(job: Job): Promise<any> {
+  const { source_dream_uuid, ...settings } = job.data || {};
+
+  const input: Record<string, unknown> = {
+    settings: source_dream_uuid ? { ...settings, source_dream_uuid } : settings,
+  };
+
+  const { id: runpodId } = await endpoints.discoDiffusion.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  return statusHandler.handleStatus(endpoints.discoDiffusion, runpodId, job);
+}

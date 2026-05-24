@@ -22,6 +22,7 @@ import {
   handleLtxI2VJob,
   handleNvidiaVsrJob,
   handleVideoIngestJob,
+  handleDiscoDiffusionJob,
 } from './workers/job-handlers.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
@@ -37,6 +38,7 @@ WorkerFactory.createWorker('zimageturbo', handleZImageTurboJob);
 WorkerFactory.createWorker('ltxi2v', handleLtxI2VJob);
 WorkerFactory.createWorker('nvidiavsr', handleNvidiaVsrJob);
 WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
+WorkerFactory.createWorker('discodiffusion', handleDiscoDiffusionJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -142,6 +144,14 @@ const videoingestQueue = new Queue('videoingest', {
     },
   },
 });
+const discoDiffusionQueue = new Queue('discodiffusion', {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
 const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
   connection: redisClient,
   streams: {
@@ -172,6 +182,7 @@ createBullBoard({
     new BullMQAdapter(ltxI2VQueue),
     new BullMQAdapter(nvidiaVsrQueue),
     new BullMQAdapter(videoingestQueue),
+    new BullMQAdapter(discoDiffusionQueue),
     new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,
