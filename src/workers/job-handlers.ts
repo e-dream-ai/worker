@@ -1598,3 +1598,34 @@ function createHunyuanWorkflow(params: {
     },
   };
 }
+
+export async function handleDiscoDiffusionJob(job: Job): Promise<any> {
+  const { dream_uuid, source_dream_uuid, auto_upload = true } = job.data || {};
+  const INTERNAL_KEYS = new Set([
+    'dream_uuid',
+    'source_dream_uuid',
+    'auto_upload',
+    'infinidream_algorithm',
+    'previous_dream_status',
+    'runpod_id',
+  ]);
+  const settings = Object.fromEntries(Object.entries(job.data || {}).filter(([k]) => !INTERNAL_KEYS.has(k)));
+
+  const input: Record<string, unknown> = {
+    settings: source_dream_uuid ? { ...settings, source_dream_uuid } : settings,
+  };
+
+  const { id: runpodId } = await endpoints.discoDiffusion.run({ input });
+  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const result = await statusHandler.handleStatus(endpoints.discoDiffusion, runpodId, job);
+
+  if (dream_uuid && auto_upload !== false && result?.r2_url) {
+    try {
+      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    } catch (error: any) {
+      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
+    }
+  }
+
+  return result;
+}
