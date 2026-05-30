@@ -1023,29 +1023,14 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
     throw new Error("Provide one of 'video_url' or 'video_uuid'");
   }
 
-  const filenamePrefix = String(job.id);
   const resolvedUrl =
     video_url && (video_url.startsWith('http://') || video_url.startsWith('https://'))
       ? video_url
       : await resolveUrlFromDreamUuid(video_url || video_uuid!);
 
-  const workflow = {
-    '1': { inputs: { file: 'input.mp4' }, class_type: 'LoadVideo' },
-    '2': { inputs: { video: ['1', 0] }, class_type: 'GetVideoComponents' },
-    '3': {
-      inputs: { images: ['2', 0], resize_type: 'scale by multiplier', 'resize_type.scale': upscale_factor, quality },
-      class_type: 'RTXVideoSuperResolution',
-    },
-    '4': { inputs: { images: ['3', 0], fps: ['2', 2], audio: ['2', 1] }, class_type: 'CreateVideo' },
-    '5': {
-      inputs: { video: ['4', 0], filename_prefix: filenamePrefix, format: 'auto', codec: 'auto' },
-      class_type: 'SaveVideo',
-    },
-  };
-
   const { id: runpodId } = await endpoints.nvidiaVsr.run(
     {
-      input: { workflow, files: [{ name: 'input.mp4', url: resolvedUrl }] },
+      input: { video_url: resolvedUrl, scale: upscale_factor, quality },
     },
     30000
   );
