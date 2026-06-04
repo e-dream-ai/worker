@@ -347,7 +347,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     interpolation_factor = 2,
     output_fps,
     output_format = 'mp4',
-    tile_size = 1024,
+    tile_size = 2048,
     tile_padding = 10,
     quality = 'high',
     dream_uuid,
@@ -1312,7 +1312,7 @@ function createLtxI2VWorkflow(params: {
         }
       : {}),
     '30': {
-      inputs: { width: 704, height: 512, length: frameCount, batch_size: 1 },
+      inputs: { width: 1024, height: 576, length: frameCount, batch_size: 1 },
       class_type: 'EmptyLTXVLatentVideo',
     },
     '31': {
