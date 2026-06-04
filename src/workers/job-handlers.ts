@@ -71,6 +71,8 @@ interface LtxI2VParams {
   negative_prompt?: string;
   duration?: number;
   seed?: number;
+  width?: number;
+  height?: number;
   lora?: string;
   lora_strength?: number;
   high_noise_loras?: LoRAConfig[];
@@ -911,6 +913,8 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     negative_prompt = 'worst quality, blurry, distorted, watermark, text, low quality',
     duration = 2,
     seed = -1,
+    width = 1024,
+    height = 576,
     lora,
     lora_strength = 0.4,
     high_noise_loras,
@@ -964,6 +968,8 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     frameCount,
     fps,
     noiseSeed,
+    width,
+    height,
     loraConfig,
     lowNoiseLoraConfig,
     filenamePrefix,
@@ -1224,6 +1230,8 @@ function createLtxI2VWorkflow(params: {
   frameCount: number;
   fps: number;
   noiseSeed: number;
+  width: number;
+  height: number;
   loraConfig?: { on: boolean; lora: string; strength: number };
   lowNoiseLoraConfig?: { on: boolean; lora: string; strength: number };
   filenamePrefix: string;
@@ -1235,6 +1243,8 @@ function createLtxI2VWorkflow(params: {
     frameCount,
     fps,
     noiseSeed,
+    width,
+    height,
     loraConfig,
     lowNoiseLoraConfig,
     filenamePrefix,
@@ -1312,7 +1322,7 @@ function createLtxI2VWorkflow(params: {
         }
       : {}),
     '30': {
-      inputs: { width: 1024, height: 576, length: frameCount, batch_size: 1 },
+      inputs: { width, height, length: frameCount, batch_size: 1 },
       class_type: 'EmptyLTXVLatentVideo',
     },
     '31': {
