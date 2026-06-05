@@ -71,6 +71,8 @@ interface LtxI2VParams {
   negative_prompt?: string;
   duration?: number;
   seed?: number;
+  width?: number;
+  height?: number;
   lora?: string;
   lora_strength?: number;
   high_noise_loras?: LoRAConfig[];
@@ -347,7 +349,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     interpolation_factor = 2,
     output_fps,
     output_format = 'mp4',
-    tile_size = 512,
+    tile_size = 1024,
     tile_padding = 10,
     quality = 'high',
     dream_uuid,
@@ -911,6 +913,8 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     negative_prompt = 'worst quality, blurry, distorted, watermark, text, low quality',
     duration = 2,
     seed = -1,
+    width = 960,
+    height = 540,
     lora,
     lora_strength = 0.4,
     high_noise_loras,
@@ -964,6 +968,8 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     frameCount,
     fps,
     noiseSeed,
+    width,
+    height,
     loraConfig,
     lowNoiseLoraConfig,
     filenamePrefix,
@@ -1224,6 +1230,8 @@ function createLtxI2VWorkflow(params: {
   frameCount: number;
   fps: number;
   noiseSeed: number;
+  width: number;
+  height: number;
   loraConfig?: { on: boolean; lora: string; strength: number };
   lowNoiseLoraConfig?: { on: boolean; lora: string; strength: number };
   filenamePrefix: string;
@@ -1235,6 +1243,8 @@ function createLtxI2VWorkflow(params: {
     frameCount,
     fps,
     noiseSeed,
+    width,
+    height,
     loraConfig,
     lowNoiseLoraConfig,
     filenamePrefix,
@@ -1312,7 +1322,7 @@ function createLtxI2VWorkflow(params: {
         }
       : {}),
     '30': {
-      inputs: { width: 704, height: 512, length: frameCount, batch_size: 1 },
+      inputs: { width, height, length: frameCount, batch_size: 1 },
       class_type: 'EmptyLTXVLatentVideo',
     },
     '31': {
