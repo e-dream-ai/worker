@@ -962,14 +962,25 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
   const noiseSeed = seed === -1 ? Math.floor(Math.random() * 1_000_000) : seed;
   const filenamePrefix = String(job.id);
 
+  // LTX generation dims must be divisible by 32; EmptyLTXVLatentVideo silently
+  // floors them otherwise, so snap here to keep latent and image scaling in sync.
+  const snap32 = (n: number) => Math.max(32, Math.round(n / 32) * 32);
+  const genWidth = snap32(width);
+  const genHeight = snap32(height);
+  if (genWidth !== width || genHeight !== height) {
+    console.warn(
+      `[handleLtxI2VJob] Snapped resolution ${width}x${height} -> ${genWidth}x${genHeight} (must be divisible by 32)`
+    );
+  }
+
   const workflow = createLtxI2VWorkflow({
     prompt,
     negative_prompt,
     frameCount,
     fps,
     noiseSeed,
-    width,
-    height,
+    width: genWidth,
+    height: genHeight,
     loraConfig,
     lowNoiseLoraConfig,
     filenamePrefix,
@@ -1309,8 +1320,15 @@ function createLtxI2VWorkflow(params: {
       inputs: { image: 'input.png', upload: 'image' },
       class_type: 'LoadImage',
     },
+    // Resize + center-crop both guide images to the exact generation resolution
+    // so first and last frames get identical geometry regardless of input aspect
+    // ratio (LTXVImgToVideoInplace and LTXVAddGuide resize differently otherwise).
+    '23': {
+      inputs: { image: ['20', 0], upscale_method: 'lanczos', width, height, crop: 'center' },
+      class_type: 'ImageScale',
+    },
     '21': {
-      inputs: { image: ['20', 0], num_frames: frameCount, img_compression: 35 },
+      inputs: { image: ['23', 0], num_frames: frameCount, img_compression: 35 },
       class_type: 'LTXVPreprocess',
     },
     ...(hasEndFrame
@@ -1318,6 +1336,10 @@ function createLtxI2VWorkflow(params: {
           '22': {
             inputs: { image: 'end_frame.png', upload: 'image' },
             class_type: 'LoadImage',
+          },
+          '24': {
+            inputs: { image: ['22', 0], upscale_method: 'lanczos', width, height, crop: 'center' },
+            class_type: 'ImageScale',
           },
         }
       : {}),
@@ -1339,7 +1361,7 @@ function createLtxI2VWorkflow(params: {
         negative: ['12', 1],
         vae: ['3', 0],
         latent: ['32', 0],
-        image: hasEndFrame ? ['22', 0] : ['20', 0],
+        image: hasEndFrame ? ['24', 0] : ['23', 0],
         frame_idx: -8,
         strength: hasEndFrame ? 1.0 : 0.7,
       },
@@ -1410,7 +1432,7 @@ function createLtxI2VWorkflow(params: {
         negative: ['12', 1],
         vae: ['3', 0],
         latent: ['51', 0],
-        image: hasEndFrame ? ['22', 0] : ['20', 0],
+        image: hasEndFrame ? ['24', 0] : ['23', 0],
         frame_idx: -8,
         strength: hasEndFrame ? 1.0 : 0.7,
       },
