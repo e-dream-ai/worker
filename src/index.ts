@@ -23,6 +23,7 @@ import {
   handleNvidiaVsrJob,
   handleVideoIngestJob,
 } from './workers/job-handlers.js';
+import { handleUserEndpointJob } from './services/user-endpoint-handler.service.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
 WorkerFactory.createWorker('video', handleVideoJob);
@@ -37,6 +38,7 @@ WorkerFactory.createWorker('zimageturbo', handleZImageTurboJob);
 WorkerFactory.createWorker('ltxi2v', handleLtxI2VJob);
 WorkerFactory.createWorker('nvidiavsr', handleNvidiaVsrJob);
 WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
+WorkerFactory.createWorker('user-endpoint', handleUserEndpointJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -142,6 +144,14 @@ const videoingestQueue = new Queue('videoingest', {
     },
   },
 });
+const userEndpointQueue = new Queue('user-endpoint', {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
 const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
   connection: redisClient,
   streams: {
@@ -172,6 +182,7 @@ createBullBoard({
     new BullMQAdapter(ltxI2VQueue),
     new BullMQAdapter(nvidiaVsrQueue),
     new BullMQAdapter(videoingestQueue),
+    new BullMQAdapter(userEndpointQueue),
     new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,
