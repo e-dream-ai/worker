@@ -69,7 +69,13 @@ export async function handleUserEndpointJob(job: Job): Promise<any> {
   }
 
   await job.log(`${new Date().toISOString()}: [UserEndpoint] Updating dream ${dream_uuid} with result`);
-  await videoServiceClient.uploadGeneratedImage(dream_uuid, r2Urls[0], renderDuration);
+  // uploadGeneratedImage catches internally and returns a boolean (it does NOT throw).
+  // Here the attach IS the deliverable, so a false return must fail the job — otherwise the
+  // dream is marked completed with no image and never flagged failed.
+  const ok = await videoServiceClient.uploadGeneratedImage(dream_uuid, r2Urls[0], renderDuration);
+  if (!ok) {
+    throw new Error(`[UserEndpoint] Failed to attach generated image to dream ${dream_uuid}`);
+  }
 
   await job.log(`${new Date().toISOString()}: [UserEndpoint] Done`);
   return { r2Urls, renderDuration };

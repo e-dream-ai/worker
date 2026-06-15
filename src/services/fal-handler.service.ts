@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Job } from 'bullmq';
 import { R2UploadService } from './r2-upload.service.js';
+import { assertSafeExternalUrl } from '../utils/url-safety.js';
 
 export interface FalJobResult {
   r2Urls: string[];
@@ -12,7 +13,18 @@ const r2UploadService = new R2UploadService();
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
-function parseFalSize(size?: string): { width: number; height: number } | undefined {
+// Per-request timeouts (ms) so a hung provider can't hold a worker slot forever.
+// The overall POLL_TIMEOUT_MS still bounds the total polling duration.
+const SUBMIT_TIMEOUT_MS = 30000;
+const POLL_REQUEST_TIMEOUT_MS = 10000;
+
+/**
+ * Parse a size string for FAL's `image_size` field.
+ * - "WxH" (e.g. "1024x768") -> { width, height } object
+ * - any other non-empty string (e.g. "square_hd", "landscape_16_9") -> passed
+ *   through unchanged so FAL can interpret its named/preset sizes.
+ */
+function parseFalSize(size?: string): { width: number; height: number } | string | undefined {
   if (!size) return undefined;
   const parts = size.toLowerCase().split('x');
   if (parts.length === 2) {
@@ -22,7 +34,8 @@ function parseFalSize(size?: string): { width: number; height: number } | undefi
       return { width, height };
     }
   }
-  return undefined;
+  // Not WxH — pass the original string through for FAL's named/preset sizes.
+  return size;
 }
 
 export async function handleFalJob(
@@ -42,6 +55,10 @@ export async function handleFalJob(
   const startMs = Date.now();
 
   await job.log(`${new Date().toISOString()}: [FAL] Starting request to ${endpointUrl}`);
+
+  // SSRF guard: the endpoint URL is user-controlled; block internal targets before any outbound call.
+  await assertSafeExternalUrl(endpointUrl);
+
   await job.updateProgress({ status: 'IN_PROGRESS', progress: 5, dream_uuid: job.data.dream_uuid });
 
   const body: Record<string, unknown> = {
@@ -64,6 +81,7 @@ export async function handleFalJob(
       Authorization: `Key ${apiKey}`,
       'Content-Type': 'application/json',
     },
+    timeout: SUBMIT_TIMEOUT_MS,
   });
 
   const submitData = submitRes.data;
@@ -99,6 +117,7 @@ export async function handleFalJob(
 
       const statusRes = await axios.get(statusUrl, {
         headers: { Authorization: `Key ${apiKey}` },
+        timeout: POLL_REQUEST_TIMEOUT_MS,
       });
 
       const statusData = statusRes.data;
@@ -128,9 +147,12 @@ export async function handleFalJob(
     await job.log(`${new Date().toISOString()}: [FAL] Fetching result from ${resultUrl}`);
     const resultRes = await axios.get(resultUrl, {
       headers: { Authorization: `Key ${apiKey}` },
+      timeout: POLL_REQUEST_TIMEOUT_MS,
     });
 
-    images = resultRes.data?.images ?? [];
+    // Different FAL apps return images at different paths; fall back so a
+    // differently-shaped result doesn't silently yield zero images.
+    images = resultRes.data?.images ?? resultRes.data?.output?.images ?? [];
   } else {
     throw new Error(`[FAL] Unexpected response: ${JSON.stringify(submitData)}`);
   }

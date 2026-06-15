@@ -2,6 +2,11 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { Job } from 'bullmq';
 import { R2UploadService } from './r2-upload.service.js';
+import { assertSafeExternalUrl } from '../utils/url-safety.js';
+
+// Per-request timeouts (ms) so a hung provider can't hold a worker slot forever.
+const GENERATION_TIMEOUT_MS = 120000;
+const IMAGE_DOWNLOAD_TIMEOUT_MS = 30000;
 
 export interface OpenAiJobResult {
   r2Urls: string[];
@@ -27,6 +32,10 @@ export async function handleOpenAiJob(
   const startMs = Date.now();
 
   await job.log(`${new Date().toISOString()}: [OpenAI] Starting request to ${endpointUrl}`);
+
+  // SSRF guard: the endpoint URL is user-controlled; block internal targets before any outbound call.
+  await assertSafeExternalUrl(endpointUrl);
+
   await job.updateProgress({ status: 'IN_PROGRESS', progress: 10, dream_uuid: job.data.dream_uuid });
 
   let responseData: any;
@@ -37,7 +46,10 @@ export async function handleOpenAiJob(
     await job.log(`${new Date().toISOString()}: [OpenAI] Downloading source image for i2i request`);
 
     // Download the source image as a buffer
-    const imgResponse = await axios.get(image, { responseType: 'arraybuffer' });
+    const imgResponse = await axios.get(image, {
+      responseType: 'arraybuffer',
+      timeout: IMAGE_DOWNLOAD_TIMEOUT_MS,
+    });
     const imgBuffer = Buffer.from(imgResponse.data);
     const contentType = (imgResponse.headers['content-type'] as string) || 'image/png';
     const ext = contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg' : 'png';
@@ -59,6 +71,7 @@ export async function handleOpenAiJob(
         Authorization: `Bearer ${apiKey}`,
         ...form.getHeaders(),
       },
+      timeout: GENERATION_TIMEOUT_MS,
     });
     responseData = res.data;
   } else {
@@ -74,6 +87,7 @@ export async function handleOpenAiJob(
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
+      timeout: GENERATION_TIMEOUT_MS,
     });
     responseData = res.data;
   }
