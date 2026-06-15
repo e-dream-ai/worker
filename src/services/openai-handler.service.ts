@@ -1,8 +1,24 @@
 import axios from 'axios';
+import https from 'https';
 import FormData from 'form-data';
 import { Job } from 'bullmq';
 import { R2UploadService } from './r2-upload.service.js';
-import { assertSafeExternalUrl } from '../utils/url-safety.js';
+import { assertSafeExternalUrl, SafeAddress } from '../utils/url-safety.js';
+
+/**
+ * Build an https.Agent that pins outbound connections to the already-validated
+ * IP, closing the DNS-rebinding TOCTOU window (validate-then-reconnect). Node
+ * merges Agent options into the TLS connect, so SNI and the Host header still
+ * use the hostname — only the resolved IP is forced.
+ */
+function pinnedAgent(safe: SafeAddress): https.Agent {
+  return new https.Agent({
+    lookup: (_hostname, _options, callback) => {
+      // Ignore the requested hostname; always return the IP we validated.
+      callback(null, safe.address, safe.family);
+    },
+  });
+}
 
 // Per-request timeouts (ms) so a hung provider can't hold a worker slot forever.
 const GENERATION_TIMEOUT_MS = 120000;
@@ -34,7 +50,10 @@ export async function handleOpenAiJob(
   await job.log(`${new Date().toISOString()}: [OpenAI] Starting request to ${endpointUrl}`);
 
   // SSRF guard: the endpoint URL is user-controlled; block internal targets before any outbound call.
-  await assertSafeExternalUrl(endpointUrl);
+  // The returned address is pinned onto the provider POST below so a rebinding
+  // host can't swap in an internal IP between validation and the request.
+  const safeEndpoint = await assertSafeExternalUrl(endpointUrl);
+  const endpointAgent = pinnedAgent(safeEndpoint);
 
   await job.updateProgress({ status: 'IN_PROGRESS', progress: 10, dream_uuid: job.data.dream_uuid });
 
@@ -72,6 +91,10 @@ export async function handleOpenAiJob(
         ...form.getHeaders(),
       },
       timeout: GENERATION_TIMEOUT_MS,
+      // Pin the validated IP and refuse redirects so the request can't escape
+      // the pinned host (a redirect to an internal target would re-resolve).
+      httpsAgent: endpointAgent,
+      maxRedirects: 0,
     });
     responseData = res.data;
   } else {
@@ -88,6 +111,10 @@ export async function handleOpenAiJob(
         'Content-Type': 'application/json',
       },
       timeout: GENERATION_TIMEOUT_MS,
+      // Pin the validated IP and refuse redirects so the request can't escape
+      // the pinned host (a redirect to an internal target would re-resolve).
+      httpsAgent: endpointAgent,
+      maxRedirects: 0,
     });
     responseData = res.data;
   }
