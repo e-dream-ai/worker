@@ -1,21 +1,7 @@
 import axios from 'axios';
-import https from 'https';
 import { Job } from 'bullmq';
 import { R2UploadService } from './r2-upload.service.js';
-import { assertSafeExternalUrl, SafeAddress } from '../utils/url-safety.js';
-
-/**
- * Build an https.Agent that pins outbound connections to the already-validated
- * IP, closing the DNS-rebinding TOCTOU window. Node merges Agent options into
- * the TLS connect, so SNI and the Host header still use the hostname.
- */
-function pinnedAgent(safe: SafeAddress): https.Agent {
-  return new https.Agent({
-    lookup: (_hostname, _options, callback) => {
-      callback(null, safe.address, safe.family);
-    },
-  });
-}
+import { assertSafeExternalUrl, createPinnedAgent } from '../utils/url-safety.js';
 
 export interface FalJobResult {
   r2Urls: string[];
@@ -74,7 +60,7 @@ export async function handleFalJob(
   // The submit endpoint is a single known host, so we pin the validated IP onto
   // the submit POST below to close the DNS-rebinding TOCTOU window.
   const safeEndpoint = await assertSafeExternalUrl(endpointUrl);
-  const submitAgent = pinnedAgent(safeEndpoint);
+  const submitAgent = createPinnedAgent(safeEndpoint);
 
   await job.updateProgress({ status: 'IN_PROGRESS', progress: 5, dream_uuid: job.data.dream_uuid });
 
@@ -101,9 +87,9 @@ export async function handleFalJob(
     timeout: SUBMIT_TIMEOUT_MS,
     // Pin the validated submit-host IP and refuse redirects (rebinding/redirect
     // can't escape the pin). NOTE: we only pin the SUBMIT call. The status/result
-    // polls below target a DIFFERENT host (queue.fal.run) derived from FAL's
-    // response, so pinning the submit IP onto them would be wrong — we
-    // re-validate those URLs separately instead.
+    // polls below target a DIFFERENT, fixed host (queue.fal.run) — only the path
+    // derives from the user endpoint — so pinning the submit IP onto them would
+    // be wrong. We re-validate those URLs (resolve-then-fetch) separately instead.
     httpsAgent: submitAgent,
     maxRedirects: 0,
   });
@@ -139,11 +125,12 @@ export async function handleFalJob(
 
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-      // The poll host (queue.fal.run) comes from FAL's response and may differ
-      // from the submit host, so we re-validate it each time rather than pinning
-      // the submit IP. We do NOT pin here: these are fal-controlled hosts and we
-      // let them resolve normally; re-validating is cheap and blocks the obvious
-      // internal-target hole if a response ever pointed us somewhere unsafe.
+      // The poll host is the fixed constant `queue.fal.run` (only the path is
+      // derived from the user endpoint); it differs from the submit host, so we
+      // re-validate it each time rather than pinning the submit IP. We do NOT
+      // pin here — this is resolve-then-fetch, letting the constant host resolve
+      // normally; re-validating is cheap and guards that constant host against
+      // the obvious internal-target hole.
       await assertSafeExternalUrl(statusUrl);
       const statusRes = await axios.get(statusUrl, {
         headers: { Authorization: `Key ${apiKey}` },
@@ -175,8 +162,9 @@ export async function handleFalJob(
     }
 
     await job.log(`${new Date().toISOString()}: [FAL] Fetching result from ${resultUrl}`);
-    // Same asymmetry as the status poll: re-validate the fal-controlled result
-    // host, but do NOT pin (different host from the pinned submit endpoint).
+    // Same asymmetry as the status poll: re-validate the fixed `queue.fal.run`
+    // result host (resolve-then-fetch), but do NOT pin (different host from the
+    // pinned submit endpoint).
     await assertSafeExternalUrl(resultUrl);
     const resultRes = await axios.get(resultUrl, {
       headers: { Authorization: `Key ${apiKey}` },

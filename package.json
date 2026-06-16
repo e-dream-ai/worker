@@ -12,7 +12,7 @@
     "marketing:clean": "node dist/marketing-clean.js",
     "marketing:worker": "node dist/marketing-worker.js",
     "lint": "eslint . -c src/*.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsc && node dist/url-safety.check.js",
     "prepare": "husky install"
   },
   "author": "Max Carlson",

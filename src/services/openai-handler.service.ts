@@ -1,24 +1,8 @@
 import axios from 'axios';
-import https from 'https';
 import FormData from 'form-data';
 import { Job } from 'bullmq';
 import { R2UploadService } from './r2-upload.service.js';
-import { assertSafeExternalUrl, SafeAddress } from '../utils/url-safety.js';
-
-/**
- * Build an https.Agent that pins outbound connections to the already-validated
- * IP, closing the DNS-rebinding TOCTOU window (validate-then-reconnect). Node
- * merges Agent options into the TLS connect, so SNI and the Host header still
- * use the hostname — only the resolved IP is forced.
- */
-function pinnedAgent(safe: SafeAddress): https.Agent {
-  return new https.Agent({
-    lookup: (_hostname, _options, callback) => {
-      // Ignore the requested hostname; always return the IP we validated.
-      callback(null, safe.address, safe.family);
-    },
-  });
-}
+import { assertSafeExternalUrl, createPinnedAgent } from '../utils/url-safety.js';
 
 // Per-request timeouts (ms) so a hung provider can't hold a worker slot forever.
 const GENERATION_TIMEOUT_MS = 120000;
@@ -53,7 +37,7 @@ export async function handleOpenAiJob(
   // The returned address is pinned onto the provider POST below so a rebinding
   // host can't swap in an internal IP between validation and the request.
   const safeEndpoint = await assertSafeExternalUrl(endpointUrl);
-  const endpointAgent = pinnedAgent(safeEndpoint);
+  const endpointAgent = createPinnedAgent(safeEndpoint);
 
   await job.updateProgress({ status: 'IN_PROGRESS', progress: 10, dream_uuid: job.data.dream_uuid });
 
