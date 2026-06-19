@@ -5,6 +5,7 @@ export interface WorkerModelConfig {
   minDurationSec: number;
   maxDurationSec: number;
   defaultDurationSec: number;
+  allowedDurationsSec?: number[];
 }
 
 export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
@@ -15,6 +16,15 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     minDurationSec: 3,
     maxDurationSec: 15,
     defaultDurationSec: 5,
+  },
+  'kling-25-i2v': {
+    id: 'kling-25-i2v',
+    provider: 'fal',
+    endpoint: 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
+    minDurationSec: 5,
+    maxDurationSec: 10,
+    defaultDurationSec: 5,
+    allowedDurationsSec: [5, 10],
   },
 };
 

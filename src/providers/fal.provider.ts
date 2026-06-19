@@ -14,17 +14,25 @@ function getClient(apiKey: string): FalClient {
   return client;
 }
 
-function buildKlingInput(input: NormalizedVideoInput): Record<string, unknown> {
+function buildKlingInput(endpoint: string, input: NormalizedVideoInput): Record<string, unknown> {
+  const isV3 = endpoint.includes('/v3/');
   const body: Record<string, unknown> = {
     prompt: input.prompt,
-    start_image_url: input.startImageUrl,
-    generate_audio: false,
   };
+  if (isV3) {
+    body.start_image_url = input.startImageUrl;
+    body.generate_audio = false;
+    if (input.endImageUrl) {
+      body.end_image_url = input.endImageUrl;
+    }
+  } else {
+    body.image_url = input.startImageUrl;
+    if (input.endImageUrl) {
+      body.tail_image_url = input.endImageUrl;
+    }
+  }
   if (typeof input.durationSec === 'number') {
     body.duration = String(Math.round(input.durationSec));
-  }
-  if (input.endImageUrl) {
-    body.end_image_url = input.endImageUrl;
   }
   if (input.negativePrompt) {
     body.negative_prompt = input.negativePrompt;
@@ -41,7 +49,7 @@ export const falVideoProvider: VideoProvider = {
   async submit(endpoint, input, apiKey): Promise<ProviderSubmitResult> {
     const client = getClient(apiKey);
     const { request_id } = await client.queue.submit(endpoint, {
-      input: buildKlingInput(input),
+      input: buildKlingInput(endpoint, input),
     });
     return { requestId: request_id };
   },

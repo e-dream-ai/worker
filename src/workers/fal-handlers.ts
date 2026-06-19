@@ -43,10 +43,14 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
   ]);
 
   const durationSec = typeof duration === 'number' ? Math.round(duration) : modelConfig.defaultDurationSec;
-  if (durationSec < modelConfig.minDurationSec || durationSec > modelConfig.maxDurationSec) {
-    throw new Error(
-      `duration ${durationSec}s is out of range for ${infinidream_algorithm} (allowed ${modelConfig.minDurationSec}-${modelConfig.maxDurationSec}s)`
-    );
+  const isValidDuration = modelConfig.allowedDurationsSec
+    ? modelConfig.allowedDurationsSec.includes(durationSec)
+    : durationSec >= modelConfig.minDurationSec && durationSec <= modelConfig.maxDurationSec;
+  if (!isValidDuration) {
+    const allowed = modelConfig.allowedDurationsSec
+      ? modelConfig.allowedDurationsSec.join(', ')
+      : `${modelConfig.minDurationSec}-${modelConfig.maxDurationSec}`;
+    throw new Error(`duration ${durationSec}s is invalid for ${infinidream_algorithm} (allowed: ${allowed}s)`);
   }
 
   const input: NormalizedVideoInput = {
