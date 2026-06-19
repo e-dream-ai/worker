@@ -640,7 +640,7 @@ async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
   }
 }
 
-async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
+export async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
   if (isUuid(imageInput)) {
     return await resolveImageFromDreamUuid(imageInput);
   }

@@ -14,6 +14,8 @@ export const env = cleanEnv(process.env, {
   REDIS_PORT: port({ default: 6379 }),
   REDIS_PASSWORD: str({ default: '' }),
 
+  FAL_KEY: str({ default: '' }),
+
   RUNPOD_API_KEY: str({ default: '' }),
   RUNPOD_HUNYUAN_ENDPOINT_ID: str({ default: '' }),
   RUNPOD_ANIMATEDIFF_ENDPOINT_ID: str({ default: '' }),
