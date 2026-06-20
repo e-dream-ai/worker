@@ -1,5 +1,14 @@
 import { createFalClient } from '@fal-ai/client';
-import { NormalizedVideoInput, ProviderPollResult, ProviderSubmitResult, VideoProvider } from './provider.types.js';
+import {
+  ImageProvider,
+  NormalizedImageInput,
+  NormalizedVideoInput,
+  ProviderImagePollResult,
+  ProviderPollResult,
+  ProviderStatus,
+  ProviderSubmitResult,
+  VideoProvider,
+} from './provider.types.js';
 
 type FalClient = ReturnType<typeof createFalClient>;
 
@@ -14,17 +23,55 @@ function getClient(apiKey: string): FalClient {
   return client;
 }
 
-function buildKlingInput(input: NormalizedVideoInput): Record<string, unknown> {
+async function submitToFal(
+  endpoint: string,
+  input: Record<string, unknown>,
+  apiKey: string
+): Promise<ProviderSubmitResult> {
+  const client = getClient(apiKey);
+  const { request_id } = await client.queue.submit(endpoint, { input });
+  return { requestId: request_id };
+}
+
+async function resultFromFal<T>(
+  endpoint: string,
+  requestId: string,
+  apiKey: string,
+  extract: (data: unknown) => T | undefined
+): Promise<{ status: ProviderStatus; completed: boolean; result?: T }> {
+  const client = getClient(apiKey);
+  const { status } = await client.queue.status(endpoint, { requestId, logs: false });
+  if (status !== 'COMPLETED') {
+    return { status, completed: false };
+  }
+  const { data } = await client.queue.result(endpoint, { requestId });
+  return { status: 'COMPLETED', completed: true, result: extract(data) };
+}
+
+async function cancelFal(endpoint: string, requestId: string, apiKey: string): Promise<void> {
+  const client = getClient(apiKey);
+  await client.queue.cancel(endpoint, { requestId });
+}
+
+function buildKlingInput(endpoint: string, input: NormalizedVideoInput): Record<string, unknown> {
+  const isV3 = endpoint.includes('/v3/');
   const body: Record<string, unknown> = {
     prompt: input.prompt,
-    start_image_url: input.startImageUrl,
-    generate_audio: false,
   };
+  if (isV3) {
+    body.start_image_url = input.startImageUrl;
+    body.generate_audio = false;
+    if (input.endImageUrl) {
+      body.end_image_url = input.endImageUrl;
+    }
+  } else {
+    body.image_url = input.startImageUrl;
+    if (input.endImageUrl) {
+      body.tail_image_url = input.endImageUrl;
+    }
+  }
   if (typeof input.durationSec === 'number') {
     body.duration = String(Math.round(input.durationSec));
-  }
-  if (input.endImageUrl) {
-    body.end_image_url = input.endImageUrl;
   }
   if (input.negativePrompt) {
     body.negative_prompt = input.negativePrompt;
@@ -38,39 +85,58 @@ function buildKlingInput(input: NormalizedVideoInput): Record<string, unknown> {
 export const falVideoProvider: VideoProvider = {
   name: 'fal',
 
-  async submit(endpoint, input, apiKey): Promise<ProviderSubmitResult> {
-    const client = getClient(apiKey);
-    const { request_id } = await client.queue.submit(endpoint, {
-      input: buildKlingInput(input),
-    });
-    return { requestId: request_id };
-  },
+  submit: (endpoint, input, apiKey) => submitToFal(endpoint, buildKlingInput(endpoint, input), apiKey),
 
   async poll(endpoint, requestId, apiKey): Promise<ProviderPollResult> {
-    const client = getClient(apiKey);
-    const { status } = await client.queue.status(endpoint, { requestId, logs: false });
-
-    if (status !== 'COMPLETED') {
-      return { status, completed: false };
-    }
-
-    const { data } = (await client.queue.result(endpoint, { requestId })) as {
-      data?: { video?: { url?: string } };
-    };
-    const videoUrl = data?.video?.url;
-    if (!videoUrl) {
+    const { status, completed, result } = await resultFromFal(
+      endpoint,
+      requestId,
+      apiKey,
+      (data) => (data as { video?: { url?: string } })?.video?.url
+    );
+    if (completed && !result) {
       throw new Error(`fal request ${requestId} completed but returned no video url`);
     }
-
-    return {
-      status: 'COMPLETED',
-      completed: true,
-      videoUrl,
-    };
+    return { status, completed, videoUrl: result };
   },
 
-  async cancel(endpoint, requestId, apiKey): Promise<void> {
-    const client = getClient(apiKey);
-    await client.queue.cancel(endpoint, { requestId });
+  cancel: cancelFal,
+};
+
+function buildFluxInput(input: NormalizedImageInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    prompt: input.prompt,
+    num_images: input.numImages ?? 1,
+  };
+  if (typeof input.width === 'number' && typeof input.height === 'number') {
+    body.image_size = { width: input.width, height: input.height };
+  }
+  if (typeof input.seed === 'number' && input.seed >= 0) {
+    body.seed = input.seed;
+  }
+  if (typeof input.numInferenceSteps === 'number') {
+    body.num_inference_steps = input.numInferenceSteps;
+  }
+  return body;
+}
+
+export const falImageProvider: ImageProvider = {
+  name: 'fal',
+
+  submitImage: (endpoint, input, apiKey) => submitToFal(endpoint, buildFluxInput(input), apiKey),
+
+  async pollImage(endpoint, requestId, apiKey): Promise<ProviderImagePollResult> {
+    const { status, completed, result } = await resultFromFal(endpoint, requestId, apiKey, (data) => {
+      const urls = ((data as { images?: Array<{ url?: string }> })?.images ?? [])
+        .map((image) => image?.url)
+        .filter((url): url is string => Boolean(url));
+      return urls.length > 0 ? urls : undefined;
+    });
+    if (completed && !result) {
+      throw new Error(`fal request ${requestId} completed but returned no image url`);
+    }
+    return { status, completed, imageUrls: result };
   },
+
+  cancel: cancelFal,
 };
