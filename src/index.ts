@@ -24,7 +24,7 @@ import {
   handleVideoIngestJob,
   handleDiscoDiffusionJob,
 } from './workers/job-handlers.js';
-import { handleFalVideoJob } from './workers/fal-handlers.js';
+import { handleFalVideoJob, handleFalImageJob } from './workers/fal-handlers.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
 WorkerFactory.createWorker('video', handleVideoJob);
@@ -41,6 +41,7 @@ WorkerFactory.createWorker('nvidiavsr', handleNvidiaVsrJob);
 WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
 WorkerFactory.createWorker('discodiffusion', handleDiscoDiffusionJob);
 WorkerFactory.createWorker('falvideo', handleFalVideoJob);
+WorkerFactory.createWorker('falimage', handleFalImageJob);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -162,6 +163,14 @@ const falVideoQueue = new Queue('falvideo', {
     },
   },
 });
+const falImageQueue = new Queue('falimage', {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
 const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
   connection: redisClient,
   streams: {
@@ -194,6 +203,7 @@ createBullBoard({
     new BullMQAdapter(videoingestQueue),
     new BullMQAdapter(discoDiffusionQueue),
     new BullMQAdapter(falVideoQueue),
+    new BullMQAdapter(falImageQueue),
     new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,

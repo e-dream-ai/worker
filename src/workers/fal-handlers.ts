@@ -1,8 +1,8 @@
 import { Job, Queue } from 'bullmq';
 import { getModelConfig } from '../config/models.config.js';
-import { getProvider } from '../providers/index.js';
+import { getImageProvider, getProvider } from '../providers/index.js';
 import { resolveProviderKey } from '../providers/key-resolver.js';
-import { NormalizedVideoInput, ProviderPollResult, VideoProvider } from '../providers/provider.types.js';
+import { NormalizedImageInput, NormalizedVideoInput, ProviderStatus } from '../providers/provider.types.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
 import { processImageForEndpoint } from './job-handlers.js';
 import redisClient from '../shared/redis.js';
@@ -32,6 +32,9 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
   }
 
   const modelConfig = getModelConfig(infinidream_algorithm);
+  if (modelConfig.mediaType !== 'video') {
+    throw new Error(`Model "${infinidream_algorithm}" is not a video model`);
+  }
   const provider = getProvider(modelConfig.provider);
   const apiKey = resolveProviderKey(modelConfig.provider, job);
 
@@ -67,7 +70,12 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
   await job.updateData({ ...job.data, fal_request_id: requestId });
   await job.log(`${new Date().toISOString()}: Submitted to fal (${modelConfig.endpoint}), request ${requestId}`);
 
-  const final = await pollUntilComplete(job, provider, modelConfig.endpoint, requestId, apiKey);
+  const final = await pollUntilComplete(
+    job,
+    requestId,
+    () => provider.poll(modelConfig.endpoint, requestId, apiKey),
+    () => (provider.cancel ? provider.cancel(modelConfig.endpoint, requestId, apiKey) : Promise.resolve())
+  );
   const renderDurationMs = final.renderDurationMs ?? Date.now() - startedAt;
 
   if (!final.videoUrl) {
@@ -81,29 +89,84 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
   return { status: 'COMPLETED', video_url: final.videoUrl, render_duration: renderDurationMs };
 }
 
-async function pollUntilComplete(
+export async function handleFalImageJob(job: Job): Promise<unknown> {
+  const { prompt, size, seed, num_inference_steps, infinidream_algorithm, dream_uuid, auto_upload = true } = job.data;
+
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('prompt is required and must be a string');
+  }
+
+  const modelConfig = getModelConfig(infinidream_algorithm);
+  if (modelConfig.mediaType !== 'image') {
+    throw new Error(`Model "${infinidream_algorithm}" is not an image model`);
+  }
+  const provider = getImageProvider(modelConfig.provider);
+  const apiKey = resolveProviderKey(modelConfig.provider, job);
+
+  const input: NormalizedImageInput = {
+    prompt,
+    ...parseImageSize(size),
+    seed: typeof seed === 'number' ? seed : undefined,
+    numInferenceSteps: typeof num_inference_steps === 'number' ? num_inference_steps : undefined,
+    numImages: 1,
+  };
+
+  const startedAt = Date.now();
+  const { requestId } = await provider.submitImage(modelConfig.endpoint, input, apiKey);
+  await job.updateData({ ...job.data, fal_request_id: requestId });
+  await job.log(`${new Date().toISOString()}: Submitted to fal (${modelConfig.endpoint}), request ${requestId}`);
+
+  const final = await pollUntilComplete(
+    job,
+    requestId,
+    () => provider.pollImage(modelConfig.endpoint, requestId, apiKey),
+    () => (provider.cancel ? provider.cancel(modelConfig.endpoint, requestId, apiKey) : Promise.resolve())
+  );
+  const renderDurationMs = final.renderDurationMs ?? Date.now() - startedAt;
+
+  const imageUrl = final.imageUrls?.[0];
+  if (!imageUrl) {
+    throw new Error(`fal request ${requestId} finished without an image url`);
+  }
+
+  if (dream_uuid && auto_upload !== false) {
+    await videoServiceClient.uploadGeneratedImage(dream_uuid, imageUrl, renderDurationMs);
+  }
+
+  return { status: 'COMPLETED', image_url: imageUrl, render_duration: renderDurationMs };
+}
+
+function parseImageSize(size: unknown): { width?: number; height?: number } {
+  if (typeof size !== 'string') {
+    return {};
+  }
+  const [width, height] = size.split(/[*x]/).map((value) => parseInt(value, 10));
+  if (Number.isFinite(width) && Number.isFinite(height)) {
+    return { width, height };
+  }
+  return {};
+}
+
+async function pollUntilComplete<T extends { status: ProviderStatus; completed: boolean }>(
   job: Job,
-  provider: VideoProvider,
-  endpoint: string,
   requestId: string,
-  apiKey: string
-): Promise<ProviderPollResult> {
+  poll: () => Promise<T>,
+  cancel: () => Promise<void>
+): Promise<T> {
   let lastStatus = '';
 
   for (;;) {
     if (await isCancelledByUser(job)) {
       await job.log(`${new Date().toISOString()}: Job cancelled by user, cancelling fal request ${requestId}`);
-      if (provider.cancel) {
-        try {
-          await provider.cancel(endpoint, requestId, apiKey);
-        } catch (error: unknown) {
-          console.error(`Failed to cancel fal request ${requestId}:`, error);
-        }
+      try {
+        await cancel();
+      } catch (error: unknown) {
+        console.error(`Failed to cancel fal request ${requestId}:`, error);
       }
       throw new Error('Job was cancelled by user');
     }
 
-    const result = await provider.poll(endpoint, requestId, apiKey);
+    const result = await poll();
 
     await job.updateProgress({
       status: result.status,
