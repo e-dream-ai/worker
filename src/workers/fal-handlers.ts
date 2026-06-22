@@ -36,7 +36,7 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
     throw new Error(`Model "${infinidream_algorithm}" is not a video model`);
   }
   const provider = getProvider(modelConfig.provider);
-  const apiKey = resolveProviderKey(modelConfig.provider, job);
+  const apiKey = await resolveProviderKey(modelConfig.provider, job);
 
   const [startImageUrl, endImageUrl] = await Promise.all([
     processImageForEndpoint(image, String(job.id)),
@@ -101,7 +101,7 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
     throw new Error(`Model "${infinidream_algorithm}" is not an image model`);
   }
   const provider = getImageProvider(modelConfig.provider);
-  const apiKey = resolveProviderKey(modelConfig.provider, job);
+  const apiKey = await resolveProviderKey(modelConfig.provider, job);
 
   const input: NormalizedImageInput = {
     prompt,
