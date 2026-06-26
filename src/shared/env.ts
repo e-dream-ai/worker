@@ -42,6 +42,7 @@ export const env = cleanEnv(process.env, {
   VIDEO_SERVICE_API_KEY: str({ default: '' }),
   BACKEND_URL: str({ default: 'http://localhost:8080/api/v1' }),
   BACKEND_API_KEY: str({ default: '' }),
+  INTERNAL_API_KEY: str({ default: '' }),
   MARKETING_EMAIL_SECRET: str({ default: '' }),
   MARKETING_QUEUE_NAME: str({ default: 'marketing-email' }),
   MARKETING_CONCURRENCY: port({ default: 10 }),
