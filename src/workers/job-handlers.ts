@@ -1262,9 +1262,25 @@ function createLtxI2VWorkflow(params: {
     hasEndFrame,
   } = params;
 
+  // Node 1: Load dev (full) transformer
+  // Node 7: Distill LoRA (so dev model samples few-step LCM)
+  // Node 2: DualCLIPLoader (Gemma 3 + text projection)
+  // Node 3: Video VAE
+  // Node 4: Audio VAE (KJNodes)
+  // Node 5: Spatial upscaler
+  // Node 6: Power Lora Loader
+  // Node 10-12: Text encoding + conditioning
+  // Node 20-21: Image loading + preprocess
+  // Node 30-33: Latent setup (video + audio)
+  // Node 40-45: Pass 1 (8 steps, LCM, LTXVScheduler)
+  // Node 50-52: Spatial upscale + re-inject image + recombine audio
+  // Node 60-65: Pass 2 (3 steps, LCM, ManualSigmas)
+  // Node 70-71: Decode (video tiled + audio)
+  // Node 80: Output (VHS_VideoCombine)
+
   const loraNode: Record<string, unknown> = {
     inputs: {
-      model: ['1', 0],
+      model: ['7', 0],
     },
     class_type: 'Power Lora Loader (rgthree)',
   };
@@ -1278,10 +1294,20 @@ function createLtxI2VWorkflow(params: {
   return {
     '1': {
       inputs: {
-        unet_name: 'ltx-2.3-22b-distilled_transformer_only_fp8_scaled.safetensors',
+        unet_name: 'ltx-2.3-22b-dev_transformer_only_fp8_scaled.safetensors',
         weight_dtype: 'default',
       },
       class_type: 'UNETLoader',
+    },
+    // Distill LoRA — required when running the full (dev) transformer so it can
+    // still sample few-step LCM (Jef's "Distill Lora (ONLY if you use DEV model)").
+    '7': {
+      inputs: {
+        model: ['1', 0],
+        lora_name: 'ltx-2-19b-distilled-lora-384.safetensors',
+        strength_model: 0.6,
+      },
+      class_type: 'LoraLoaderModelOnly',
     },
     '2': {
       inputs: {
@@ -1375,6 +1401,8 @@ function createLtxI2VWorkflow(params: {
       class_type: 'LTXVConcatAVLatent',
     },
 
+    // ── Pass 1: Low-res (8 steps, LCM, LTXVScheduler) ──
+    // Few-step LCM works because the distill LoRA (node 7) is applied to the dev model.
     '40': {
       inputs: { steps: 8, max_shift: 2.05, base_shift: 0.95, stretch: true, terminal: 0.1 },
       class_type: 'LTXVScheduler',
@@ -1445,6 +1473,7 @@ function createLtxI2VWorkflow(params: {
       },
       class_type: 'LTXVConcatAVLatent',
     },
+    // Pass 2 refinement after spatial upscale — partial denoise from ~0.91 (3-step LCM).
     '60': {
       inputs: { sigmas: '0.909375, 0.725, 0.421875, 0.0' },
       class_type: 'ManualSigmas',
