@@ -12,7 +12,7 @@
     "marketing:clean": "node dist/marketing-clean.js",
     "marketing:worker": "node dist/marketing-worker.js",
     "lint": "eslint . -c src/*.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "prepare": "husky install"
   },
   "author": "Max Carlson",
@@ -50,7 +50,8 @@
     "nodemon": "^3.1.9",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^4.1.9"
   },
   "husky": {
     "hooks": {
