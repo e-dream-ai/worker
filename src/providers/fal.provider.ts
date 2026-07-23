@@ -120,10 +120,28 @@ function buildFluxInput(input: NormalizedImageInput): Record<string, unknown> {
   return body;
 }
 
+// Image-to-image (FLUX.1 Kontext). The fal Kontext endpoint takes the source
+// image as `image_url` and has NO image_size/width/height (the output follows
+// the source). Seed is optional; we only forward a real (>= 0) seed.
+export function buildKontextInput(input: NormalizedImageInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    prompt: input.prompt,
+    image_url: input.imageUrl,
+    num_images: input.numImages ?? 1,
+  };
+  if (typeof input.seed === 'number' && input.seed >= 0) {
+    body.seed = input.seed;
+  }
+  return body;
+}
+
 export const falImageProvider: ImageProvider = {
   name: 'fal',
 
-  submitImage: (endpoint, input, apiKey) => submitToFal(endpoint, buildFluxInput(input), apiKey),
+  // Branch on input.imageUrl: the handler sets it only for inputImage (i2i)
+  // models, so its presence is a safe discriminator for the Kontext path.
+  submitImage: (endpoint, input, apiKey) =>
+    submitToFal(endpoint, input.imageUrl ? buildKontextInput(input) : buildFluxInput(input), apiKey),
 
   async pollImage(endpoint, requestId, apiKey): Promise<ProviderImagePollResult> {
     const { status, completed, result } = await resultFromFal(endpoint, requestId, apiKey, (data) => {
