@@ -356,6 +356,10 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     auto_upload = true,
   } = job.data || {};
 
+  if (upscale_factor === 1 && interpolation_factor === 1) {
+    throw new Error("'upscale_factor' and 'interpolation_factor' cannot both be 1, that would be a no-op");
+  }
+
   const input: Record<string, unknown> = {
     upscale_factor,
     interpolation_factor,
