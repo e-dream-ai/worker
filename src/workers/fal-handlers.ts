@@ -103,12 +103,24 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   const provider = getImageProvider(modelConfig.provider);
   const apiKey = await resolveProviderKey(modelConfig.provider, job);
 
+  // Image-to-image models (e.g. Kontext) require a source image. Resolve the
+  // source dream UUID (or URL) to a real image URL for the provider.
+  let sourceImageUrl: string | undefined;
+  if (modelConfig.inputImage) {
+    const sourceRef = job.data.source_dream_uuid;
+    if (!sourceRef || typeof sourceRef !== 'string') {
+      throw new Error(`Model "${infinidream_algorithm}" requires source_dream_uuid`);
+    }
+    sourceImageUrl = await processImageForEndpoint(sourceRef, String(job.id));
+  }
+
   const input: NormalizedImageInput = {
     prompt,
     ...parseImageSize(size),
     seed: typeof seed === 'number' ? seed : undefined,
     numInferenceSteps: typeof num_inference_steps === 'number' ? num_inference_steps : undefined,
     numImages: 1,
+    imageUrl: sourceImageUrl,
   };
 
   const startedAt = Date.now();

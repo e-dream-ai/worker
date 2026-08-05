@@ -14,6 +14,7 @@ export interface VideoModelConfig extends BaseModelConfig {
 
 export interface ImageModelConfig extends BaseModelConfig {
   mediaType: 'image';
+  inputImage?: boolean; // model takes a source image (image-to-image, e.g. Kontext)
 }
 
 export type WorkerModelConfig = VideoModelConfig | ImageModelConfig;
@@ -43,6 +44,13 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     provider: 'fal',
     mediaType: 'image',
     endpoint: 'fal-ai/flux-1/schnell',
+  },
+  'flux-kontext-i2i': {
+    id: 'flux-kontext-i2i',
+    provider: 'fal',
+    mediaType: 'image',
+    endpoint: 'fal-ai/flux-pro/kontext',
+    inputImage: true,
   },
 };
 
