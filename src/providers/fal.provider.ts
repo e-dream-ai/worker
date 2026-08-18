@@ -4,6 +4,7 @@ import {
   NormalizedImageInput,
   NormalizedVideoInput,
   ProviderImagePollResult,
+  ProviderLogEntry,
   ProviderPollResult,
   ProviderStatus,
   ProviderSubmitResult,
@@ -30,7 +31,7 @@ async function submitToFal(
 ): Promise<ProviderSubmitResult> {
   const client = getClient(apiKey);
   const { request_id } = await client.queue.submit(endpoint, { input });
-  return { requestId: request_id };
+  return { requestId: request_id, submittedInput: input };
 }
 
 async function resultFromFal<T>(
@@ -38,14 +39,19 @@ async function resultFromFal<T>(
   requestId: string,
   apiKey: string,
   extract: (data: unknown) => T | undefined
-): Promise<{ status: ProviderStatus; completed: boolean; result?: T }> {
+): Promise<{ status: ProviderStatus; completed: boolean; result?: T; logs?: ProviderLogEntry[] }> {
   const client = getClient(apiKey);
-  const { status } = await client.queue.status(endpoint, { requestId, logs: false });
+  const queueStatus = await client.queue.status(endpoint, { requestId, logs: true });
+  const { status } = queueStatus;
+  const logs =
+    'logs' in queueStatus && Array.isArray(queueStatus.logs)
+      ? queueStatus.logs.map(({ message, level, timestamp }) => ({ message, level, timestamp }))
+      : undefined;
   if (status !== 'COMPLETED') {
-    return { status, completed: false };
+    return { status, completed: false, logs };
   }
   const { data } = await client.queue.result(endpoint, { requestId });
-  return { status: 'COMPLETED', completed: true, result: extract(data) };
+  return { status: 'COMPLETED', completed: true, result: extract(data), logs };
 }
 
 async function cancelFal(endpoint: string, requestId: string, apiKey: string): Promise<void> {
@@ -88,7 +94,7 @@ export const falVideoProvider: VideoProvider = {
   submit: (endpoint, input, apiKey) => submitToFal(endpoint, buildKlingInput(endpoint, input), apiKey),
 
   async poll(endpoint, requestId, apiKey): Promise<ProviderPollResult> {
-    const { status, completed, result } = await resultFromFal(
+    const { status, completed, result, logs } = await resultFromFal(
       endpoint,
       requestId,
       apiKey,
@@ -97,7 +103,7 @@ export const falVideoProvider: VideoProvider = {
     if (completed && !result) {
       throw new Error(`fal request ${requestId} completed but returned no video url`);
     }
-    return { status, completed, videoUrl: result };
+    return { status, completed, videoUrl: result, logs };
   },
 
   cancel: cancelFal,
@@ -144,7 +150,7 @@ export const falImageProvider: ImageProvider = {
     submitToFal(endpoint, input.imageUrl ? buildKontextInput(input) : buildFluxInput(input), apiKey),
 
   async pollImage(endpoint, requestId, apiKey): Promise<ProviderImagePollResult> {
-    const { status, completed, result } = await resultFromFal(endpoint, requestId, apiKey, (data) => {
+    const { status, completed, result, logs } = await resultFromFal(endpoint, requestId, apiKey, (data) => {
       const urls = ((data as { images?: Array<{ url?: string }> })?.images ?? [])
         .map((image) => image?.url)
         .filter((url): url is string => Boolean(url));
@@ -153,7 +159,7 @@ export const falImageProvider: ImageProvider = {
     if (completed && !result) {
       throw new Error(`fal request ${requestId} completed but returned no image url`);
     }
-    return { status, completed, imageUrls: result };
+    return { status, completed, imageUrls: result, logs };
   },
 
   cancel: cancelFal,

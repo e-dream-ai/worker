@@ -19,15 +19,23 @@ export interface NormalizedImageInput {
 
 export interface ProviderSubmitResult {
   requestId: string;
+  submittedInput?: Readonly<Record<string, unknown>>;
 }
 
 export type ProviderStatus = 'IN_QUEUE' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+
+export interface ProviderLogEntry {
+  message: string;
+  level?: string;
+  timestamp?: string;
+}
 
 export interface ProviderPollResult {
   status: ProviderStatus;
   completed: boolean;
   videoUrl?: string;
   renderDurationMs?: number;
+  logs?: ProviderLogEntry[];
 }
 
 export interface ProviderImagePollResult {
@@ -35,6 +43,7 @@ export interface ProviderImagePollResult {
   completed: boolean;
   imageUrls?: string[];
   renderDurationMs?: number;
+  logs?: ProviderLogEntry[];
 }
 
 export interface VideoProvider {

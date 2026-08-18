@@ -2,7 +2,12 @@ import { Job, Queue } from 'bullmq';
 import { getModelConfig } from '../config/models.config.js';
 import { getImageProvider, getProvider } from '../providers/index.js';
 import { resolveProviderKey } from '../providers/key-resolver.js';
-import { NormalizedImageInput, NormalizedVideoInput, ProviderStatus } from '../providers/provider.types.js';
+import {
+  NormalizedImageInput,
+  NormalizedVideoInput,
+  ProviderLogEntry,
+  ProviderStatus,
+} from '../providers/provider.types.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
 import { processImageForEndpoint } from './job-handlers.js';
 import redisClient from '../shared/redis.js';
@@ -62,13 +67,13 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
     endImageUrl,
     durationSec,
     negativePrompt: typeof negative_prompt === 'string' ? negative_prompt : undefined,
-    cfgScale: typeof cfg_scale === 'number' ? cfg_scale : undefined,
+    cfgScale: resolveCfgScale(cfg_scale, modelConfig.cfgScaleRange, infinidream_algorithm),
   };
 
   const startedAt = Date.now();
-  const { requestId } = await provider.submit(modelConfig.endpoint, input, apiKey);
+  const { requestId, submittedInput } = await provider.submit(modelConfig.endpoint, input, apiKey);
   await job.updateData({ ...job.data, fal_request_id: requestId });
-  await job.log(`${new Date().toISOString()}: Submitted to fal (${modelConfig.endpoint}), request ${requestId}`);
+  await logFalSubmission(job, modelConfig.endpoint, requestId, submittedInput);
 
   const final = await pollUntilComplete(
     job,
@@ -124,9 +129,9 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   };
 
   const startedAt = Date.now();
-  const { requestId } = await provider.submitImage(modelConfig.endpoint, input, apiKey);
+  const { requestId, submittedInput } = await provider.submitImage(modelConfig.endpoint, input, apiKey);
   await job.updateData({ ...job.data, fal_request_id: requestId });
-  await job.log(`${new Date().toISOString()}: Submitted to fal (${modelConfig.endpoint}), request ${requestId}`);
+  await logFalSubmission(job, modelConfig.endpoint, requestId, submittedInput);
 
   const final = await pollUntilComplete(
     job,
@@ -148,6 +153,24 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   return { status: 'COMPLETED', image_url: imageUrl, render_duration: renderDurationMs };
 }
 
+function resolveCfgScale(
+  cfgScale: unknown,
+  range: { min: number; max: number } | undefined,
+  modelId: string
+): number | undefined {
+  if (typeof cfgScale !== 'number' || !Number.isFinite(cfgScale)) {
+    return undefined;
+  }
+  if (!range) {
+    return cfgScale;
+  }
+  const clamped = Math.min(range.max, Math.max(range.min, cfgScale));
+  if (clamped !== cfgScale) {
+    console.warn(`[handleFalVideoJob] Clamped cfg_scale ${cfgScale} -> ${clamped} for ${modelId}`);
+  }
+  return clamped;
+}
+
 function parseImageSize(size: unknown): { width?: number; height?: number } {
   if (typeof size !== 'string') {
     return {};
@@ -159,13 +182,14 @@ function parseImageSize(size: unknown): { width?: number; height?: number } {
   return {};
 }
 
-async function pollUntilComplete<T extends { status: ProviderStatus; completed: boolean }>(
+async function pollUntilComplete<T extends { status: ProviderStatus; completed: boolean; logs?: ProviderLogEntry[] }>(
   job: Job,
   requestId: string,
   poll: () => Promise<T>,
   cancel: () => Promise<void>
 ): Promise<T> {
   let lastStatus = '';
+  const seenFalLogs = new Set<string>();
 
   for (;;) {
     if (await isCancelledByUser(job)) {
@@ -192,11 +216,43 @@ async function pollUntilComplete<T extends { status: ProviderStatus; completed: 
       await job.log(`${new Date().toISOString()}: fal status ${result.status}`);
     }
 
+    await appendFalLogs(job, result.logs, seenFalLogs);
+
     if (result.completed) {
       return result;
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+}
+
+async function logFalSubmission(
+  job: Job,
+  endpoint: string,
+  requestId: string,
+  submittedInput?: Readonly<Record<string, unknown>>
+): Promise<void> {
+  const inputLog = submittedInput ? `, input ${JSON.stringify(redactUrls(submittedInput))}` : '';
+  await job.log(`${new Date().toISOString()}: Submitted to fal (${endpoint}), request ${requestId}${inputLog}`);
+}
+
+function redactUrls(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) => [key, key.endsWith('_url') ? '[redacted]' : value])
+  );
+}
+
+async function appendFalLogs(job: Job, logs: ProviderLogEntry[] | undefined, seen: Set<string>): Promise<void> {
+  for (const log of logs ?? []) {
+    const key = JSON.stringify([log.timestamp ?? '', log.level ?? '', log.message]);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+
+    const timestamp = log.timestamp || new Date().toISOString();
+    const level = log.level ? ` [${log.level}]` : '';
+    await job.log(`${timestamp}: fal${level}: ${log.message}`);
   }
 }
 

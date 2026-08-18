@@ -55,6 +55,7 @@ interface Wan22I2VLoraParams {
   image?: string;
   last_image?: string;
   duration?: number;
+  guidance?: number;
   seed?: number;
   loras?: LoRAConfig[];
   high_noise_loras?: LoRAConfig[];
@@ -70,6 +71,7 @@ interface LtxI2VParams {
   end_source_uuid?: string;
   negative_prompt?: string;
   duration?: number;
+  guidance?: number;
   seed?: number;
   width?: number;
   height?: number;
@@ -700,6 +702,7 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
     image,
     last_image,
     duration = 5,
+    guidance = 5,
     seed = -1,
     loras,
     high_noise_loras,
@@ -718,6 +721,7 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const input: Record<string, unknown> = {
     prompt,
     duration,
+    guidance,
     seed,
     enable_base64_output,
     enable_sync_mode,
@@ -909,6 +913,21 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
   return result;
 }
 
+const LTX_DEFAULT_GUIDANCE = 1.0;
+const LTX_MIN_GUIDANCE = 1.0;
+const LTX_MAX_GUIDANCE = 5.0;
+
+function clampLtxGuidance(guidance: unknown): number {
+  if (typeof guidance !== 'number' || !Number.isFinite(guidance)) {
+    return LTX_DEFAULT_GUIDANCE;
+  }
+  const clamped = Math.min(LTX_MAX_GUIDANCE, Math.max(LTX_MIN_GUIDANCE, guidance));
+  if (clamped !== guidance) {
+    console.warn(`[handleLtxI2VJob] Clamped guidance ${guidance} -> ${clamped}`);
+  }
+  return clamped;
+}
+
 export async function handleLtxI2VJob(job: Job): Promise<any> {
   const {
     prompt,
@@ -916,6 +935,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     end_source_uuid: endImage,
     negative_prompt = 'worst quality, blurry, distorted, watermark, text, low quality',
     duration = 2,
+    guidance,
     seed = -1,
     width = 1024,
     height = 576,
@@ -980,6 +1000,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
   const workflow = createLtxI2VWorkflow({
     prompt,
     negative_prompt,
+    cfg: clampLtxGuidance(guidance),
     frameCount,
     fps,
     noiseSeed,
@@ -1242,6 +1263,7 @@ function createAnimatediffWorkflow(params: {
 function createLtxI2VWorkflow(params: {
   prompt: string;
   negative_prompt: string;
+  cfg: number;
   frameCount: number;
   fps: number;
   noiseSeed: number;
@@ -1255,6 +1277,7 @@ function createLtxI2VWorkflow(params: {
   const {
     prompt,
     negative_prompt,
+    cfg,
     frameCount,
     fps,
     noiseSeed,
@@ -1424,7 +1447,7 @@ function createLtxI2VWorkflow(params: {
         model: ['6', 0],
         positive: ['34', 0],
         negative: ['34', 1],
-        cfg: 1.0,
+        cfg,
       },
       class_type: 'CFGGuider',
     },
@@ -1495,7 +1518,7 @@ function createLtxI2VWorkflow(params: {
         model: ['6', 0],
         positive: ['53', 0],
         negative: ['53', 1],
-        cfg: 1.0,
+        cfg,
       },
       class_type: 'CFGGuider',
     },
