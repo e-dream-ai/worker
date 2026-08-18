@@ -10,6 +10,7 @@ export interface VideoModelConfig extends BaseModelConfig {
   maxDurationSec: number;
   defaultDurationSec: number;
   allowedDurationsSec?: number[];
+  cfgScaleRange?: { min: number; max: number };
 }
 
 export interface ImageModelConfig extends BaseModelConfig {
@@ -28,6 +29,7 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     minDurationSec: 3,
     maxDurationSec: 15,
     defaultDurationSec: 5,
+    cfgScaleRange: { min: 0, max: 1 },
   },
   'kling-25-i2v': {
     id: 'kling-25-i2v',
@@ -38,6 +40,7 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     maxDurationSec: 10,
     defaultDurationSec: 5,
     allowedDurationsSec: [5, 10],
+    cfgScaleRange: { min: 0, max: 1 },
   },
   'flux-schnell': {
     id: 'flux-schnell',

@@ -67,7 +67,7 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
     endImageUrl,
     durationSec,
     negativePrompt: typeof negative_prompt === 'string' ? negative_prompt : undefined,
-    cfgScale: typeof cfg_scale === 'number' ? cfg_scale : undefined,
+    cfgScale: resolveCfgScale(cfg_scale, modelConfig.cfgScaleRange, infinidream_algorithm),
   };
 
   const startedAt = Date.now();
@@ -151,6 +151,24 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   }
 
   return { status: 'COMPLETED', image_url: imageUrl, render_duration: renderDurationMs };
+}
+
+function resolveCfgScale(
+  cfgScale: unknown,
+  range: { min: number; max: number } | undefined,
+  modelId: string
+): number | undefined {
+  if (typeof cfgScale !== 'number' || !Number.isFinite(cfgScale)) {
+    return undefined;
+  }
+  if (!range) {
+    return cfgScale;
+  }
+  const clamped = Math.min(range.max, Math.max(range.min, cfgScale));
+  if (clamped !== cfgScale) {
+    console.warn(`[handleFalVideoJob] Clamped cfg_scale ${cfgScale} -> ${clamped} for ${modelId}`);
+  }
+  return clamped;
 }
 
 function parseImageSize(size: unknown): { width?: number; height?: number } {
