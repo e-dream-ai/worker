@@ -17,7 +17,6 @@ interface Wan22T2V720Params {
   height?: number;
   duration?: number;
   num_inference_steps?: number;
-  guidance?: number;
   seed?: number;
   negative_prompt?: string;
   temperature?: number;
@@ -35,7 +34,6 @@ interface Wan22I2V720Params {
   height?: number;
   duration?: number;
   num_inference_steps?: number;
-  guidance?: number;
   seed?: number;
   negative_prompt?: string;
   temperature?: number;
@@ -55,7 +53,6 @@ interface Wan22I2VLoraParams {
   image?: string;
   last_image?: string;
   duration?: number;
-  guidance?: number;
   seed?: number;
   loras?: LoRAConfig[];
   high_noise_loras?: LoRAConfig[];
@@ -422,7 +419,6 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
     height,
     duration = 8,
     num_inference_steps = 30,
-    guidance = 5,
     seed = -1,
     negative_prompt = '',
     temperature,
@@ -443,7 +439,6 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
     prompt,
     duration,
     num_inference_steps,
-    guidance,
     seed,
     negative_prompt,
     flow_shift,
@@ -505,7 +500,6 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
     height,
     duration = 5,
     num_inference_steps = 30,
-    guidance = 5,
     seed = -1,
     negative_prompt = '',
     temperature,
@@ -531,7 +525,6 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
     image: await processImageForEndpoint(image, String(job.id)),
     duration,
     num_inference_steps,
-    guidance,
     seed,
     negative_prompt,
     flow_shift,
@@ -702,7 +695,6 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
     image,
     last_image,
     duration = 5,
-    guidance = 5,
     seed = -1,
     loras,
     high_noise_loras,
@@ -721,7 +713,6 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const input: Record<string, unknown> = {
     prompt,
     duration,
-    guidance,
     seed,
     enable_base64_output,
     enable_sync_mode,
