@@ -5,6 +5,7 @@ import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
 import { R2UploadService } from '../services/r2-upload.service.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
+import { downloadBytes, extractFinalFrame } from './video-frame.js';
 
 const statusHandler = new StatusHandlerService();
 const r2UploadService = new R2UploadService();
@@ -616,9 +617,34 @@ async function resolveUrlFromDreamUuid(dreamUuid: string, expectedMediaType?: st
   }
 }
 
-async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
+/**
+ * Use a rendered clip as a source image by taking its final frame.
+ *
+ * A generation reproduces its start image exactly but only approximates its
+ * tail image, so chaining clip N+1 onto clip N's *rendered* last frame is the
+ * only way to make the cut between them seamless — pointing both at the shared
+ * keyframe leaves the seam at the mercy of how well the model landed the tail.
+ */
+async function resolveFinalFrameFromVideoDream(dreamUuid: string, videoUrl: string, jobId: string): Promise<string> {
+  const frame = await extractFinalFrame(await downloadBytes(videoUrl));
+  const url = await r2UploadService.uploadImageBufferToR2(frame, jobId, `${jobId}-${dreamUuid}-final.png`);
+  console.log(`[processImageForEndpoint] using final frame of video dream ${dreamUuid} as source image`);
+  return url;
+}
+
+async function resolveImageFromDreamUuid(dreamUuid: string, jobId: string): Promise<string> {
   try {
     const dream = await videoServiceClient.getDreamInfo(dreamUuid);
+
+    if (dream.mediaType === 'video') {
+      // The processed copy is the one that plays, so it is the one whose last
+      // frame the next clip has to open on.
+      const videoUrl = dream.video || dream.original_video;
+      if (!videoUrl) {
+        throw new Error(`Dream ${dreamUuid} does not have a video URL (video or original_video)`);
+      }
+      return await resolveFinalFrameFromVideoDream(dreamUuid, videoUrl, jobId);
+    }
 
     if (dream.mediaType !== 'image') {
       throw new Error(`Dream ${dreamUuid} is not an image dream (mediaType: ${dream.mediaType})`);
@@ -648,7 +674,7 @@ async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
 
 export async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
   if (isUuid(imageInput)) {
-    return await resolveImageFromDreamUuid(imageInput);
+    return await resolveImageFromDreamUuid(imageInput, jobId);
   }
 
   const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');

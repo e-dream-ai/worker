@@ -59,7 +59,7 @@ async function cancelFal(endpoint: string, requestId: string, apiKey: string): P
   await client.queue.cancel(endpoint, { requestId });
 }
 
-function buildKlingInput(endpoint: string, input: NormalizedVideoInput): Record<string, unknown> {
+export function buildKlingInput(endpoint: string, input: NormalizedVideoInput): Record<string, unknown> {
   const isV3 = endpoint.includes('/v3/');
   const body: Record<string, unknown> = {
     prompt: input.prompt,
