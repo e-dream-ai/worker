@@ -82,37 +82,7 @@ export class StatusHandlerService {
     const startedAtMs = Date.now();
 
     do {
-      try {
-        const jobState = await job.getState();
-        if (jobState === 'failed') {
-          await job.log(`${new Date().toISOString()}: Job state is failed, checking if cancelled by user`);
-
-          const queue = new Queue(job.queueName, { connection: redisClient });
-          const freshJob = await queue.getJob(String(job.id));
-          await queue.close();
-
-          if (freshJob?.data?.cancelled_by_user === true) {
-            await job.log(`${new Date().toISOString()}: Job cancelled by user, stopping polling`);
-
-            if (freshJob.data?.cancel_runpod !== false) {
-              await job.log(`${new Date().toISOString()}: Cancelling RunPod job ${runpodId}`);
-              await this.runpodCancelService.cancelJob(endpoint, runpodId);
-            }
-
-            throw new Error('Job was cancelled by user');
-          }
-
-          const failedReason = freshJob?.failedReason || 'Unknown reason';
-          await job.log(`${new Date().toISOString()}: Job failed in queue (${failedReason}), stopping polling`);
-          throw new Error(`Job failed in queue: ${failedReason}`);
-        }
-      } catch (stateError: any) {
-        if (stateError.message !== 'Job was cancelled by user') {
-          console.error('Error checking job state:', stateError);
-        } else {
-          throw stateError;
-        }
-      }
+      await this.throwIfStopped(endpoint, runpodId, job);
 
       try {
         const rawStatus = await endpoint.status(runpodId);
@@ -238,7 +208,53 @@ export class StatusHandlerService {
       }
     } while (status?.completed === false);
 
+    await this.throwIfStopped(endpoint, runpodId, job);
+
     return status as RunpodStatus;
+  }
+
+  private async throwIfStopped(endpoint: any, runpodId: string, job: Job): Promise<void> {
+    let jobState: string;
+    try {
+      jobState = await job.getState();
+    } catch (stateError: any) {
+      console.error('Error checking job state:', stateError);
+      return;
+    }
+
+    if (jobState !== 'failed') {
+      return;
+    }
+
+    await job.log(`${new Date().toISOString()}: Job state is failed, checking if cancelled by user`);
+
+    let freshJob: Job | undefined;
+    try {
+      const queue = new Queue(job.queueName, { connection: redisClient });
+      try {
+        freshJob = await queue.getJob(String(job.id));
+      } finally {
+        await queue.close();
+      }
+    } catch (readError: any) {
+      console.error('Error reading job from queue:', readError);
+      return;
+    }
+
+    if (freshJob?.data?.cancelled_by_user === true) {
+      await job.log(`${new Date().toISOString()}: Job cancelled by user, stopping polling`);
+
+      if (freshJob.data?.cancel_runpod !== false) {
+        await job.log(`${new Date().toISOString()}: Cancelling RunPod job ${runpodId}`);
+        await this.runpodCancelService.cancelJob(endpoint, runpodId);
+      }
+
+      throw new Error('Job was cancelled by user');
+    }
+
+    const failedReason = freshJob?.failedReason || 'Unknown reason';
+    await job.log(`${new Date().toISOString()}: Job failed in queue (${failedReason}), stopping polling`);
+    throw new Error(`Job failed in queue: ${failedReason}`);
   }
 
   private extractResult(status: RunpodStatus): any {

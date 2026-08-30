@@ -72,7 +72,7 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
 
   const startedAt = Date.now();
   const { requestId, submittedInput } = await provider.submit(modelConfig.endpoint, input, apiKey);
-  await job.updateData({ ...job.data, fal_request_id: requestId });
+  await persistRequestId(job, requestId);
   await logFalSubmission(job, modelConfig.endpoint, requestId, submittedInput);
 
   const final = await pollUntilComplete(
@@ -130,7 +130,7 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
 
   const startedAt = Date.now();
   const { requestId, submittedInput } = await provider.submitImage(modelConfig.endpoint, input, apiKey);
-  await job.updateData({ ...job.data, fal_request_id: requestId });
+  await persistRequestId(job, requestId);
   await logFalSubmission(job, modelConfig.endpoint, requestId, submittedInput);
 
   const final = await pollUntilComplete(
@@ -219,11 +219,31 @@ async function pollUntilComplete<T extends { status: ProviderStatus; completed: 
     await appendFalLogs(job, result.logs, seenFalLogs);
 
     if (result.completed) {
+      if (await isCancelledByUser(job)) {
+        await job.log(`${new Date().toISOString()}: Job cancelled by user, discarding finished fal result`);
+        throw new Error('Job was cancelled by user');
+      }
       return result;
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
+}
+
+async function persistRequestId(job: Job, requestId: string): Promise<void> {
+  let latestData = job.data;
+
+  const queue = new Queue(job.queueName, { connection: redisClient });
+  try {
+    const freshJob = await queue.getJob(String(job.id));
+    latestData = freshJob?.data ?? job.data;
+  } catch (error: unknown) {
+    console.error(`Failed to re-read job ${job.id} before storing fal request id:`, error);
+  } finally {
+    await queue.close();
+  }
+
+  await job.updateData({ ...latestData, fal_request_id: requestId });
 }
 
 async function logFalSubmission(
