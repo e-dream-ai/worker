@@ -1,3 +1,15 @@
+import { TargetGeometry } from '../utils/image-geometry.js';
+
+/**
+ * Kling resizes head and tail images differently above a 2560px long side, so
+ * its inputs get snapped to one of these first. See utils/image-geometry.ts.
+ */
+const KLING_INPUT_GEOMETRY: readonly TargetGeometry[] = [
+  { width: 1920, height: 1080 }, // 16:9
+  { width: 1080, height: 1920 }, // 9:16
+  { width: 1080, height: 1080 }, // 1:1
+];
+
 interface BaseModelConfig {
   id: string;
   provider: 'fal';
@@ -11,6 +23,12 @@ export interface VideoModelConfig extends BaseModelConfig {
   defaultDurationSec: number;
   allowedDurationsSec?: number[];
   cfgScaleRange?: { min: number; max: number };
+  /**
+   * Fixed sizes this model's input images are snapped to before submission,
+   * picked by nearest aspect ratio. Set it where the provider handles the start
+   * and end image differently; omit it to send images through untouched.
+   */
+  inputGeometry?: readonly TargetGeometry[];
 }
 
 export interface ImageModelConfig extends BaseModelConfig {
@@ -30,6 +48,7 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     maxDurationSec: 15,
     defaultDurationSec: 5,
     cfgScaleRange: { min: 0, max: 1 },
+    inputGeometry: KLING_INPUT_GEOMETRY,
   },
   'kling-25-i2v': {
     id: 'kling-25-i2v',
@@ -41,6 +60,7 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     defaultDurationSec: 5,
     allowedDurationsSec: [5, 10],
     cfgScaleRange: { min: 0, max: 1 },
+    inputGeometry: KLING_INPUT_GEOMETRY,
   },
   'flux-schnell': {
     id: 'flux-schnell',
