@@ -15,10 +15,12 @@
  * to an already-signed URL costs nothing and needs no new storage.
  */
 
-export interface TargetGeometry {
-  width: number;
-  height: number;
+export interface ImageSize {
+  readonly width: number;
+  readonly height: number;
 }
+
+export type NonEmptyArray<T> = readonly [T, ...T[]];
 
 /**
  * Cloudflare Image Resizing cannot emit PNG — `format=png` silently returns
@@ -29,6 +31,8 @@ export interface TargetGeometry {
 const OUTPUT_FORMAT = 'jpeg';
 const OUTPUT_QUALITY = 95;
 
+const SIGNATURE_PATTERN = /^[0-9a-f]{64}$/;
+
 /**
  * cf-image-worker applies `w`/`h`/`fit`/`format`/`q` to any request carrying a
  * valid `sig`. Anything else (a third-party URL, a base64 blob, a local path
@@ -36,7 +40,8 @@ const OUTPUT_QUALITY = 95;
  */
 export function isTransformableUrl(url: string): boolean {
   try {
-    return new URL(url).searchParams.has('sig');
+    const sig = new URL(url).searchParams.get('sig');
+    return sig !== null && SIGNATURE_PATTERN.test(sig);
   } catch {
     return false;
   }
@@ -46,29 +51,26 @@ export function isTransformableUrl(url: string): boolean {
  * Nearest candidate by aspect ratio. Compared in log space so that 2:1 and 1:2
  * sit the same distance from square rather than 1.0 and 0.5.
  */
-export function pickTarget(
-  width: number,
-  height: number,
-  candidates: readonly TargetGeometry[]
-): TargetGeometry | undefined {
-  if (candidates.length === 0 || !(width > 0) || !(height > 0)) {
+export function pickTarget(source: ImageSize, candidates: NonEmptyArray<ImageSize>): ImageSize | undefined {
+  const { width, height } = source;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return undefined;
   }
   const sourceAspect = Math.log(width / height);
-  const distance = (candidate: TargetGeometry) => Math.abs(Math.log(candidate.width / candidate.height) - sourceAspect);
+  const distance = (candidate: ImageSize) => Math.abs(Math.log(candidate.width / candidate.height) - sourceAspect);
   return candidates.reduce((best, candidate) => (distance(candidate) < distance(best) ? candidate : best));
 }
 
-export function sameTarget(a: TargetGeometry, b: TargetGeometry): boolean {
+export function sameSize(a: ImageSize, b: ImageSize): boolean {
   return a.width === b.width && a.height === b.height;
 }
 
-export function formatTarget(target: TargetGeometry): string {
-  return `${target.width}x${target.height}`;
+export function formatSize(size: ImageSize): `${number}x${number}` {
+  return `${size.width}x${size.height}`;
 }
 
 /** Append the transform params. `fit=cover` guarantees exactly the target size. */
-export function withGeometry(url: string, target: TargetGeometry): string {
+export function withGeometry(url: string, target: ImageSize): string {
   const parsed = new URL(url);
   parsed.searchParams.set('w', String(target.width));
   parsed.searchParams.set('h', String(target.height));
@@ -78,24 +80,39 @@ export function withGeometry(url: string, target: TargetGeometry): string {
   return parsed.toString();
 }
 
+function readProbedSize(body: unknown): ImageSize | undefined {
+  if (typeof body !== 'object' || body === null || !('original' in body)) {
+    return undefined;
+  }
+  const original = (body as { original: unknown }).original;
+  if (typeof original !== 'object' || original === null) {
+    return undefined;
+  }
+  const { width, height } = original as { width?: unknown; height?: unknown };
+  if (typeof width !== 'number' || typeof height !== 'number' || width <= 0 || height <= 0) {
+    return undefined;
+  }
+  return { width, height };
+}
+
 /**
  * Ask cf-image-worker for the stored object's dimensions. Only needed when the
  * caller passed a raw URL instead of a dream UUID, since a dream record already
  * carries them.
  */
-export async function probeImageSize(url: string): Promise<TargetGeometry | undefined> {
+export async function probeImageSize(url: string): Promise<ImageSize | undefined> {
   try {
     const parsed = new URL(url);
     parsed.searchParams.set('format', 'json');
     const { fetch } = await import('undici');
     const response = await fetch(parsed.toString());
     if (!response.ok) {
+      console.warn(`[geometry] size probe returned ${response.status}`);
       return undefined;
     }
-    const body = (await response.json()) as { original?: { width?: number; height?: number } };
-    const { width, height } = body.original ?? {};
-    return width && height ? { width, height } : undefined;
-  } catch {
+    return readProbedSize(await response.json());
+  } catch (error: any) {
+    console.warn(`[geometry] size probe failed: ${error.message || error}`);
     return undefined;
   }
 }

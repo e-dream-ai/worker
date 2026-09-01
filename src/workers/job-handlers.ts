@@ -1,9 +1,11 @@
 import { Job } from 'bullmq';
 import {
-  TargetGeometry,
+  ImageSize,
+  NonEmptyArray,
   isTransformableUrl,
   pickTarget,
   probeImageSize,
+  sameSize,
   withGeometry,
 } from '../utils/image-geometry.js';
 import { readFileSync } from 'fs';
@@ -618,11 +620,15 @@ async function resolveUrlFromDreamUuid(dreamUuid: string, expectedMediaType?: st
 
 interface ResolvedImage {
   url: string;
-  width?: number;
-  height?: number;
+  size?: ImageSize;
 }
 
-async function resolveImageFromDreamUuid(dreamUuid: string, preferOriginal = false): Promise<ResolvedImage> {
+type ImageRendition = 'processed' | 'original';
+
+async function resolveImageFromDreamUuid(
+  dreamUuid: string,
+  rendition: ImageRendition = 'processed'
+): Promise<ResolvedImage> {
   try {
     const dream = await videoServiceClient.getDreamInfo(dreamUuid);
 
@@ -637,7 +643,8 @@ async function resolveImageFromDreamUuid(dreamUuid: string, preferOriginal = fal
      * costs 34.7dB for nothing. The backend only returns `original_video` to
      * callers identifying as EdreamSDK, which VideoServiceClient does.
      */
-    const imageUrl = preferOriginal ? dream.original_video || dream.video : dream.video || dream.original_video;
+    const imageUrl =
+      rendition === 'original' ? dream.original_video || dream.video : dream.video || dream.original_video;
 
     if (!imageUrl) {
       throw new Error(`Dream ${dreamUuid} does not have an image URL (video or original_video)`);
@@ -646,12 +653,11 @@ async function resolveImageFromDreamUuid(dreamUuid: string, preferOriginal = fal
     const absoluteUrl =
       imageUrl.startsWith('http://') || imageUrl.startsWith('https://') ? imageUrl : `https://${imageUrl}`;
 
-    // The processed dimensions describe the webp, which the ingest conversion
-    // does not resize, so they hold for the original too.
+    const { processedMediaWidth: width, processedMediaHeight: height } = dream;
+
     return {
       url: absoluteUrl,
-      width: dream.processedMediaWidth ?? undefined,
-      height: dream.processedMediaHeight ?? undefined,
+      size: width && height ? { width, height } : undefined,
     };
   } catch (error: any) {
     if (error.response?.status === 404) {
@@ -698,6 +704,15 @@ export async function processImageForEndpoint(imageInput: string, jobId: string)
   }
 }
 
+export interface NormalizedImage {
+  url: string;
+  target?: ImageSize;
+}
+
+function describeInput(imageInput: string): string {
+  return imageInput.length > 80 ? `${imageInput.slice(0, 60)}… (${imageInput.length} chars)` : imageInput;
+}
+
 /**
  * Resolve an input image and snap it to one of the model's fixed input sizes.
  *
@@ -713,34 +728,31 @@ export async function processImageForEndpoint(imageInput: string, jobId: string)
 export async function processImageForModel(
   imageInput: string,
   jobId: string,
-  candidates: readonly TargetGeometry[]
-): Promise<{ url: string; target?: TargetGeometry }> {
+  candidates: NonEmptyArray<ImageSize>
+): Promise<NormalizedImage> {
   const resolved: ResolvedImage = isUuid(imageInput)
-    ? await resolveImageFromDreamUuid(imageInput, true)
+    ? await resolveImageFromDreamUuid(imageInput, 'original')
     : { url: await processImageForEndpoint(imageInput, jobId) };
 
   if (!isTransformableUrl(resolved.url)) {
-    console.warn(`[geometry] ${imageInput} is not a transformable URL, sending it unchanged`);
+    console.warn(`[geometry] ${describeInput(imageInput)} is not a transformable URL, sending it unchanged`);
     return { url: resolved.url };
   }
 
-  const size =
-    resolved.width && resolved.height
-      ? { width: resolved.width, height: resolved.height }
-      : await probeImageSize(resolved.url);
+  const size = resolved.size ?? (await probeImageSize(resolved.url));
 
   if (!size) {
-    console.warn(`[geometry] could not determine the size of ${imageInput}, sending it unchanged`);
+    console.warn(`[geometry] could not determine the size of ${describeInput(imageInput)}, sending it unchanged`);
     return { url: resolved.url };
   }
 
-  const target = pickTarget(size.width, size.height, candidates);
+  const target = pickTarget(size, candidates);
   if (!target) {
     return { url: resolved.url };
   }
 
   // Already the right size: don't spend a re-encode on it.
-  if (size.width === target.width && size.height === target.height) {
+  if (sameSize(size, target)) {
     return { url: resolved.url, target };
   }
 

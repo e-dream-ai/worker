@@ -1,10 +1,10 @@
-import { TargetGeometry } from '../utils/image-geometry.js';
+import type { ImageSize, NonEmptyArray } from '../utils/image-geometry.js';
 
 /**
  * Kling resizes head and tail images differently above a 2560px long side, so
  * its inputs get snapped to one of these first. See utils/image-geometry.ts.
  */
-const KLING_INPUT_GEOMETRY: readonly TargetGeometry[] = [
+const KLING_INPUT_GEOMETRY: NonEmptyArray<ImageSize> = [
   { width: 1920, height: 1080 }, // 16:9
   { width: 1080, height: 1920 }, // 9:16
   { width: 1080, height: 1080 }, // 1:1
@@ -28,7 +28,7 @@ export interface VideoModelConfig extends BaseModelConfig {
    * picked by nearest aspect ratio. Set it where the provider handles the start
    * and end image differently; omit it to send images through untouched.
    */
-  inputGeometry?: readonly TargetGeometry[];
+  inputGeometry?: NonEmptyArray<ImageSize>;
 }
 
 export interface ImageModelConfig extends BaseModelConfig {

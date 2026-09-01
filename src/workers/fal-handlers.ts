@@ -9,8 +9,8 @@ import {
   ProviderStatus,
 } from '../providers/provider.types.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
-import { processImageForEndpoint, processImageForModel } from './job-handlers.js';
-import { TargetGeometry, formatTarget, sameTarget } from '../utils/image-geometry.js';
+import { NormalizedImage, processImageForEndpoint, processImageForModel } from './job-handlers.js';
+import { ImageSize, NonEmptyArray, formatSize, sameSize } from '../utils/image-geometry.js';
 import redisClient from '../shared/redis.js';
 
 const videoServiceClient = new VideoServiceClient();
@@ -24,9 +24,9 @@ const POLL_INTERVAL_MS = 5000;
 async function resolveInputImage(
   input: string,
   jobId: string,
-  geometry?: readonly TargetGeometry[]
-): Promise<{ url: string; target?: TargetGeometry }> {
-  if (geometry && geometry.length > 0) {
+  geometry?: NonEmptyArray<ImageSize>
+): Promise<NormalizedImage> {
+  if (geometry) {
     return processImageForModel(input, jobId, geometry);
   }
   return { url: await processImageForEndpoint(input, jobId) };
@@ -73,10 +73,10 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
    * behaves. frontend#668 already treats mixed aspect ratios as an error in the
    * UI; this enforces it for every caller.
    */
-  if (start.target && end?.target && !sameTarget(start.target, end.target)) {
+  if (start.target && end?.target && !sameSize(start.target, end.target)) {
     throw new Error(
-      `start and end images normalize to different sizes (${formatTarget(start.target)} vs ` +
-        `${formatTarget(end.target)}); both ends of a transition must have the same aspect ratio`
+      `start and end images normalize to different sizes (${formatSize(start.target)} vs ` +
+        `${formatSize(end.target)}); both ends of a transition must have the same aspect ratio`
     );
   }
 
