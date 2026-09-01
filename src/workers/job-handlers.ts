@@ -1,4 +1,13 @@
 import { Job } from 'bullmq';
+import {
+  ImageSize,
+  NonEmptyArray,
+  isTransformableUrl,
+  pickTarget,
+  probeImageSize,
+  sameSize,
+  withGeometry,
+} from '../utils/image-geometry.js';
 import { readFileSync } from 'fs';
 import { existsSync } from 'fs';
 import { endpoints } from '../config/runpod.config.js';
@@ -609,7 +618,17 @@ async function resolveUrlFromDreamUuid(dreamUuid: string, expectedMediaType?: st
   }
 }
 
-async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
+interface ResolvedImage {
+  url: string;
+  size?: ImageSize;
+}
+
+type ImageRendition = 'processed' | 'original';
+
+async function resolveImageFromDreamUuid(
+  dreamUuid: string,
+  rendition: ImageRendition = 'processed'
+): Promise<ResolvedImage> {
   try {
     const dream = await videoServiceClient.getDreamInfo(dreamUuid);
 
@@ -617,17 +636,29 @@ async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
       throw new Error(`Dream ${dreamUuid} is not an image dream (mediaType: ${dream.mediaType})`);
     }
 
-    const imageUrl = dream.video || dream.original_video;
+    /*
+     * `video` is the lossy _processed.webp the video service writes at ingest;
+     * `original_video` is the untouched upload. When we are going to re-encode
+     * the image anyway, start from the master — delivering from the webp instead
+     * costs 34.7dB for nothing. The backend only returns `original_video` to
+     * callers identifying as EdreamSDK, which VideoServiceClient does.
+     */
+    const imageUrl =
+      rendition === 'original' ? dream.original_video || dream.video : dream.video || dream.original_video;
 
     if (!imageUrl) {
       throw new Error(`Dream ${dreamUuid} does not have an image URL (video or original_video)`);
     }
 
-    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-      return `https://${imageUrl}`;
-    }
+    const absoluteUrl =
+      imageUrl.startsWith('http://') || imageUrl.startsWith('https://') ? imageUrl : `https://${imageUrl}`;
 
-    return imageUrl;
+    const { processedMediaWidth: width, processedMediaHeight: height } = dream;
+
+    return {
+      url: absoluteUrl,
+      size: width && height ? { width, height } : undefined,
+    };
   } catch (error: any) {
     if (error.response?.status === 404) {
       throw new Error(`Dream ${dreamUuid} not found`);
@@ -641,7 +672,7 @@ async function resolveImageFromDreamUuid(dreamUuid: string): Promise<string> {
 
 export async function processImageForEndpoint(imageInput: string, jobId: string): Promise<string> {
   if (isUuid(imageInput)) {
-    return await resolveImageFromDreamUuid(imageInput);
+    return (await resolveImageFromDreamUuid(imageInput)).url;
   }
 
   const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');
@@ -671,6 +702,61 @@ export async function processImageForEndpoint(imageInput: string, jobId: string)
   } catch {
     throw new Error(`Image input "${imageInput}" is not a valid URL, existing file path, base64 string, or dream UUID`);
   }
+}
+
+export interface NormalizedImage {
+  url: string;
+  target?: ImageSize;
+}
+
+function describeInput(imageInput: string): string {
+  return imageInput.length > 80 ? `${imageInput.slice(0, 60)}… (${imageInput.length} chars)` : imageInput;
+}
+
+/**
+ * Resolve an input image and snap it to one of the model's fixed input sizes.
+ *
+ * Returns the target it picked so the caller can require both ends of a
+ * transition to land on the same one — a start and end image arriving at
+ * different geometries is exactly the mismatch this exists to prevent
+ * (frontend#640, frontend#733).
+ *
+ * Anything we cannot measure or cannot transform is passed through unchanged
+ * rather than failing the job: normalization is an improvement on the old
+ * behavior, not a new precondition for rendering.
+ */
+export async function processImageForModel(
+  imageInput: string,
+  jobId: string,
+  candidates: NonEmptyArray<ImageSize>
+): Promise<NormalizedImage> {
+  const resolved: ResolvedImage = isUuid(imageInput)
+    ? await resolveImageFromDreamUuid(imageInput, 'original')
+    : { url: await processImageForEndpoint(imageInput, jobId) };
+
+  if (!isTransformableUrl(resolved.url)) {
+    console.warn(`[geometry] ${describeInput(imageInput)} is not a transformable URL, sending it unchanged`);
+    return { url: resolved.url };
+  }
+
+  const size = resolved.size ?? (await probeImageSize(resolved.url));
+
+  if (!size) {
+    console.warn(`[geometry] could not determine the size of ${describeInput(imageInput)}, sending it unchanged`);
+    return { url: resolved.url };
+  }
+
+  const target = pickTarget(size, candidates);
+  if (!target) {
+    return { url: resolved.url };
+  }
+
+  // Already the right size: don't spend a re-encode on it.
+  if (sameSize(size, target)) {
+    return { url: resolved.url, target };
+  }
+
+  return { url: withGeometry(resolved.url, target), target };
 }
 
 async function fetchUrlAsBase64(url: string): Promise<string> {

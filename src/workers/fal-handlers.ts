@@ -9,12 +9,28 @@ import {
   ProviderStatus,
 } from '../providers/provider.types.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
-import { processImageForEndpoint } from './job-handlers.js';
+import { NormalizedImage, processImageForEndpoint, processImageForModel } from './job-handlers.js';
+import { ImageSize, NonEmptyArray, formatSize, sameSize } from '../utils/image-geometry.js';
 import redisClient from '../shared/redis.js';
 
 const videoServiceClient = new VideoServiceClient();
 
 const POLL_INTERVAL_MS = 5000;
+
+/**
+ * Models that declare `inputGeometry` get their images snapped to a fixed size
+ * first; everything else resolves the way it always has.
+ */
+async function resolveInputImage(
+  input: string,
+  jobId: string,
+  geometry?: NonEmptyArray<ImageSize>
+): Promise<NormalizedImage> {
+  if (geometry) {
+    return processImageForModel(input, jobId, geometry);
+  }
+  return { url: await processImageForEndpoint(input, jobId) };
+}
 
 export async function handleFalVideoJob(job: Job): Promise<unknown> {
   const {
@@ -43,12 +59,29 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
   const provider = getProvider(modelConfig.provider);
   const apiKey = await resolveProviderKey(modelConfig.provider, job);
 
-  const [startImageUrl, endImageUrl] = await Promise.all([
-    processImageForEndpoint(image, String(job.id)),
+  const [start, end] = await Promise.all([
+    resolveInputImage(image, String(job.id), modelConfig.inputGeometry),
     endImage && typeof endImage === 'string'
-      ? processImageForEndpoint(endImage, String(job.id))
+      ? resolveInputImage(endImage, String(job.id), modelConfig.inputGeometry)
       : Promise.resolve(undefined),
   ]);
+
+  /*
+   * Both ends of a transition have to be normalized to the same size. If the
+   * start snaps to 16:9 and the end to 1:1 we have hand-built the mismatch this
+   * normalization exists to prevent, and the cut will pop however well the model
+   * behaves. frontend#668 already treats mixed aspect ratios as an error in the
+   * UI; this enforces it for every caller.
+   */
+  if (start.target && end?.target && !sameSize(start.target, end.target)) {
+    throw new Error(
+      `start and end images normalize to different sizes (${formatSize(start.target)} vs ` +
+        `${formatSize(end.target)}); both ends of a transition must have the same aspect ratio`
+    );
+  }
+
+  const startImageUrl = start.url;
+  const endImageUrl = end?.url;
 
   const durationSec = typeof duration === 'number' ? Math.round(duration) : modelConfig.defaultDurationSec;
   const isValidDuration = modelConfig.allowedDurationsSec

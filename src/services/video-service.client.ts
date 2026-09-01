@@ -14,6 +14,8 @@ interface DreamInfo {
   mediaType?: string;
   video?: string | null;
   original_video?: string | null;
+  processedMediaWidth?: number | null;
+  processedMediaHeight?: number | null;
 }
 
 export class VideoServiceClient {
