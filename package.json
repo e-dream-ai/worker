@@ -13,6 +13,7 @@
     "marketing:worker": "node dist/marketing-worker.js",
     "lint": "eslint . -c src/*.ts",
     "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
     "prepare": "husky install"
   },
   "author": "Max Carlson",
