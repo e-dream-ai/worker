@@ -1405,10 +1405,15 @@ function createLtxI2VWorkflow(params: {
     },
     // Distill LoRA — required when running the full (dev) transformer so it can
     // still sample few-step LCM (Jef's "Distill Lora (ONLY if you use DEV model)").
+    // Must be the 2.3/22b build. The LTX-2 19b distill LoRA binds 1364 of its 1371
+    // modules to this transformer but fails on the two adaLN modulation layers
+    // (adaln_single.linear, audio_adaln_single.linear — 24576/12288 rows vs the
+    // 22b model's 36864/18432), which ComfyUI reports as a shape error and skips.
+    // That leaves a half-distilled model and degrades the 8+3-step LCM output.
     '7': {
       inputs: {
         model: ['1', 0],
-        lora_name: 'ltx-2-19b-distilled-lora-384.safetensors',
+        lora_name: 'ltx-2.3-22b-distilled-lora-384.safetensors',
         strength_model: 0.6,
       },
       class_type: 'LoraLoaderModelOnly',
