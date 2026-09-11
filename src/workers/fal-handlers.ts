@@ -1,3 +1,4 @@
+import { getJobRunContext } from '../utils/job-progress.js';
 import { Job, Queue } from 'bullmq';
 import { getModelConfig } from '../config/models.config.js';
 import { getImageProvider, getProvider } from '../providers/index.js';
@@ -121,7 +122,7 @@ export async function handleFalVideoJob(job: Job): Promise<unknown> {
   }
 
   if (dream_uuid && auto_upload !== false) {
-    await videoServiceClient.uploadGeneratedVideo(dream_uuid, final.videoUrl, renderDurationMs);
+    await videoServiceClient.uploadGeneratedVideo(dream_uuid, final.videoUrl, renderDurationMs, getJobRunContext(job));
   }
 
   return { status: 'COMPLETED', video_url: final.videoUrl, render_duration: renderDurationMs };
@@ -180,7 +181,7 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   }
 
   if (dream_uuid && auto_upload !== false) {
-    await videoServiceClient.uploadGeneratedImage(dream_uuid, imageUrl, renderDurationMs);
+    await videoServiceClient.uploadGeneratedImage(dream_uuid, imageUrl, renderDurationMs, getJobRunContext(job));
   }
 
   return { status: 'COMPLETED', image_url: imageUrl, render_duration: renderDurationMs };
@@ -241,7 +242,7 @@ async function pollUntilComplete<T extends { status: ProviderStatus; completed: 
       status: result.status,
       completed: result.completed,
       dream_uuid: job.data.dream_uuid,
-      user_id: job.data.user_id,
+      ...getJobRunContext(job),
     });
 
     if (result.status !== lastStatus) {

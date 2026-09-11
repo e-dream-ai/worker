@@ -1,3 +1,4 @@
+import type { JobRunContext } from '../utils/job-progress.js';
 import axios from 'axios';
 import { Queue } from 'bullmq';
 import { Readable } from 'stream';
@@ -46,7 +47,12 @@ export class VideoServiceClient {
     }
   }
 
-  async uploadGeneratedVideo(dreamUuid: string, videoUrl: string, renderDuration?: number): Promise<boolean> {
+  async uploadGeneratedVideo(
+    dreamUuid: string,
+    videoUrl: string,
+    renderDuration?: number,
+    run?: JobRunContext
+  ): Promise<void> {
     try {
       const dream = await this.getDreamInfo(dreamUuid);
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
@@ -54,13 +60,7 @@ export class VideoServiceClient {
       const r2Path = await this.uploadVideoToR2(videoUrl, dreamUuid, userIdentifier);
       await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'video', renderDuration);
 
-      await this.videoingestQueue.add('message', {
-        type: 'video',
-        dream_uuid: dreamUuid,
-        extension: 'mp4',
-      });
-
-      return true;
+      await this.queueIngestion(dreamUuid, 'video', 'mp4', run);
     } catch (error: any) {
       console.error(`Failed to upload generated video for dream ${dreamUuid}:`, {
         message: error.message,
@@ -69,11 +69,16 @@ export class VideoServiceClient {
         data: error.response?.data,
         stack: error.stack,
       });
-      return false;
+      throw error;
     }
   }
 
-  async uploadGeneratedImage(dreamUuid: string, imageUrl: string, renderDuration?: number): Promise<boolean> {
+  async uploadGeneratedImage(
+    dreamUuid: string,
+    imageUrl: string,
+    renderDuration?: number,
+    run?: JobRunContext
+  ): Promise<void> {
     try {
       const dream = await this.getDreamInfo(dreamUuid);
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
@@ -81,13 +86,7 @@ export class VideoServiceClient {
       const { r2Path, extension } = await this.uploadImageToR2(imageUrl, dreamUuid, userIdentifier);
       await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image', renderDuration);
 
-      await this.videoingestQueue.add('message', {
-        type: 'image',
-        dream_uuid: dreamUuid,
-        extension,
-      });
-
-      return true;
+      await this.queueIngestion(dreamUuid, 'image', extension, run);
     } catch (error: any) {
       console.error(`Failed to upload generated image for dream ${dreamUuid}:`, {
         message: error.message,
@@ -96,7 +95,33 @@ export class VideoServiceClient {
         data: error.response?.data,
         stack: error.stack,
       });
-      return false;
+      throw error;
+    }
+  }
+
+  private async queueIngestion(
+    dreamUuid: string,
+    type: 'video' | 'image',
+    extension: string,
+    run?: JobRunContext
+  ): Promise<void> {
+    const job = await this.videoingestQueue.add('message', {
+      ...run,
+      type,
+      dream_uuid: dreamUuid,
+      extension,
+    });
+
+    try {
+      await job.updateProgress({
+        ...run,
+        dream_uuid: dreamUuid,
+        job_type: type,
+        stage: 'ingesting',
+        status: 'IN_QUEUE',
+      });
+    } catch (error) {
+      console.error(`Failed to report queued ingestion for dream ${dreamUuid}:`, error);
     }
   }
 

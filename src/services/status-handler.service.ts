@@ -1,3 +1,4 @@
+import { getJobRunContext } from '../utils/job-progress.js';
 import { Job, Queue } from 'bullmq';
 import { PublicEndpointService, PublicEndpointResponse } from './public-endpoint.service.js';
 import { R2UploadService } from './r2-upload.service.js';
@@ -139,13 +140,6 @@ export class StatusHandlerService {
             detectedProgress = rawStatus.output;
           }
 
-          if (
-            detectedProgress === undefined &&
-            (rawStatus.status === 'IN_QUEUE' || rawStatus.status === 'IN_PROGRESS')
-          ) {
-            detectedProgress = 0;
-          }
-
           status = {
             status: rawStatus.status,
             completed: rawStatus.completed || rawStatus.status === 'COMPLETED',
@@ -178,8 +172,9 @@ export class StatusHandlerService {
 
         const progressData = {
           ...progressStatus,
+          ...getJobRunContext(job),
+          ...(job.queueName === 'videoingest' ? { job_type: job.data.type ?? 'video', stage: 'ingesting' } : {}),
           dream_uuid: job.data.dream_uuid,
-          user_id: job.data.user_id,
         };
 
         await job.updateProgress(progressData);
