@@ -1,3 +1,4 @@
+import { getJobRunContext } from '../utils/job-progress.js';
 import { Job } from 'bullmq';
 import {
   ImageSize,
@@ -251,11 +252,12 @@ export async function handleVideoJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleVideoJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -342,7 +344,12 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.deforum, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   }
 
   return result;
@@ -402,11 +409,12 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleUprezVideoJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -482,11 +490,12 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleWanT2VJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -568,11 +577,12 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleWanI2VJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -845,11 +855,12 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleWanI2VLoraJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -897,11 +908,12 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedImage(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleQwenImageJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -972,11 +984,12 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.zImageTurbo, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated image for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedImage(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleZImageTurboJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -1105,11 +1118,12 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.ltxI2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleLtxI2VJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -1157,11 +1171,12 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   } else if (dream_uuid) {
     console.error(`[handleNvidiaVsrJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -1791,11 +1806,12 @@ export async function handleDiscoDiffusionJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.discoDiffusion, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    try {
-      await videoServiceClient.uploadGeneratedVideo(dream_uuid, result.r2_url, result.render_duration);
-    } catch (error: any) {
-      console.error(`Failed to upload generated video for dream ${dream_uuid}:`, error.message || error);
-    }
+    await videoServiceClient.uploadGeneratedVideo(
+      dream_uuid,
+      result.r2_url,
+      result.render_duration,
+      getJobRunContext(job)
+    );
   }
 
   return result;
