@@ -1,4 +1,4 @@
-import { createFalClient } from '@fal-ai/client';
+import { createFalClient, ValidationError, type FalClient } from '@fal-ai/client';
 import {
   ImageProvider,
   NormalizedImageInput,
@@ -11,9 +11,32 @@ import {
   VideoProvider,
 } from './provider.types.js';
 
-type FalClient = ReturnType<typeof createFalClient>;
-
 const clientsByKey = new Map<string, FalClient>();
+
+async function withFalErrorDetail<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error: unknown) {
+    if (error instanceof ValidationError && error.body) {
+      const fields = error.fieldErrors;
+      const detail = fields
+        .filter(({ msg }) => msg.trim())
+        .map(({ loc, msg }) => {
+          const field = (loc[0] === 'body' ? loc.slice(1) : loc).join('.');
+          return field ? `${field}: ${msg.trim()}` : msg.trim();
+        })
+        .join('; ');
+
+      if (detail) {
+        const message = `fal rejected this request (HTTP ${error.status}): ${detail}`;
+        error.message = fields.some(({ type }) => type === 'content_policy_violation')
+          ? `The model's content filter rejected this prompt or image. Try rephrasing the prompt or using a different image. ${message}`
+          : message;
+      }
+    }
+    throw error;
+  }
+}
 
 function getClient(apiKey: string): FalClient {
   let client = clientsByKey.get(apiKey);
@@ -30,7 +53,7 @@ async function submitToFal(
   apiKey: string
 ): Promise<ProviderSubmitResult> {
   const client = getClient(apiKey);
-  const { request_id } = await client.queue.submit(endpoint, { input });
+  const { request_id } = await withFalErrorDetail(() => client.queue.submit(endpoint, { input }));
   return { requestId: request_id, submittedInput: input };
 }
 
@@ -41,7 +64,7 @@ async function resultFromFal<T>(
   extract: (data: unknown) => T | undefined
 ): Promise<{ status: ProviderStatus; completed: boolean; result?: T; logs?: ProviderLogEntry[] }> {
   const client = getClient(apiKey);
-  const queueStatus = await client.queue.status(endpoint, { requestId, logs: true });
+  const queueStatus = await withFalErrorDetail(() => client.queue.status(endpoint, { requestId, logs: true }));
   const { status } = queueStatus;
   const logs =
     'logs' in queueStatus && Array.isArray(queueStatus.logs)
@@ -50,7 +73,7 @@ async function resultFromFal<T>(
   if (status !== 'COMPLETED') {
     return { status, completed: false, logs };
   }
-  const { data } = await client.queue.result(endpoint, { requestId });
+  const { data } = await withFalErrorDetail(() => client.queue.result(endpoint, { requestId }));
   return { status: 'COMPLETED', completed: true, result: extract(data), logs };
 }
 

@@ -1,4 +1,4 @@
-import { Worker } from 'bullmq';
+import { Worker, type Job } from 'bullmq';
 import redisClient from '../shared/redis.js';
 import env from '../shared/env.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
@@ -57,31 +57,12 @@ export class WorkerFactory {
     return worker;
   }
 
-  private static isUserCancellation(job: any, error: Error): boolean {
-    // Check if job was marked as cancelled
-    if (job?.data?.cancelled_by_user === true) {
-      return true;
-    }
-
-    // Check for BullMQ cancellation patterns
-    const errorMessage = error?.message?.toLowerCase() || '';
-    if (
-      errorMessage.includes('job was cancelled') ||
-      errorMessage.includes('job cancelled') ||
-      errorMessage.includes('user cancelled')
-    ) {
-      return true;
-    }
-
-    // Check if job has failedReason indicating cancellation
-    if (job?.failedReason) {
-      const failedReason = String(job.failedReason).toLowerCase();
-      if (failedReason.includes('cancelled') || failedReason.includes('canceled')) {
-        return true;
-      }
-    }
-
-    return false;
+  private static isUserCancellation(job: Job | undefined, error: Error): boolean {
+    return (
+      job?.data?.cancelled_by_user === true ||
+      error.message === 'Job was cancelled by user' ||
+      job?.failedReason === 'Job was cancelled by user'
+    );
   }
 
   private static serializeError(error: Error): string {
