@@ -2,6 +2,7 @@ import type { JobRunContext } from '../utils/job-progress.js';
 import axios from 'axios';
 import { Queue } from 'bullmq';
 import { Readable } from 'stream';
+import { setTimeout as delay } from 'node:timers/promises';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import env from '../shared/env.js';
 import redisClient from '../shared/redis.js';
@@ -136,24 +137,33 @@ export class VideoServiceClient {
   }
 
   async setDreamFailed(dreamUuid: string, error: string): Promise<void> {
-    try {
-      await axios.post(
-        `${this.backendUrl}/dream/${dreamUuid}/status/failed`,
-        { error },
-        {
-          headers: {
-            Authorization: `Api-Key ${this.backendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-    } catch (error: any) {
-      console.error(`Failed to set dream ${dreamUuid} as failed:`, {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-      });
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await axios.post(
+          `${this.backendUrl}/dream/${dreamUuid}/status/failed`,
+          { error },
+          {
+            headers: {
+              Authorization: `Api-Key ${this.backendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+          }
+        );
+        return;
+      } catch (requestError: unknown) {
+        if (!axios.isAxiosError(requestError)) throw requestError;
+        const status = requestError.response?.status;
+        const retryable = status === undefined || status === 408 || status === 429 || status >= 500;
+        if (!retryable || attempt === maxAttempts) throw requestError;
+
+        console.warn(`Retrying failed status update for dream ${dreamUuid} after attempt ${attempt}:`, {
+          message: requestError.message,
+          status,
+        });
+        await delay(1000 * 2 ** (attempt - 1));
+      }
     }
   }
 
