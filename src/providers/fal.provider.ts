@@ -164,13 +164,36 @@ export function buildKontextInput(input: NormalizedImageInput): Record<string, u
   return body;
 }
 
+function buildKreaInput(input: NormalizedImageInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    prompt: input.prompt,
+    num_images: input.numImages ?? 1,
+  };
+  if (typeof input.width === 'number' && typeof input.height === 'number') {
+    body.image_size = { width: input.width, height: input.height };
+  }
+  if (typeof input.seed === 'number' && input.seed >= 0) {
+    body.seed = input.seed;
+  }
+  return body;
+}
+
 export const falImageProvider: ImageProvider = {
   name: 'fal',
 
-  // Branch on input.imageUrl: the handler sets it only for inputImage (i2i)
-  // models, so its presence is a safe discriminator for the Kontext path.
-  submitImage: (endpoint, input, apiKey) =>
-    submitToFal(endpoint, input.imageUrl ? buildKontextInput(input) : buildFluxInput(input), apiKey),
+  async submitImage(endpoint, input, apiKey): Promise<ProviderSubmitResult> {
+    switch (endpoint) {
+      case 'fal-ai/krea-2/turbo':
+        return submitToFal(endpoint, buildKreaInput(input), apiKey);
+      case 'fal-ai/krea-2/turbo/style':
+        if (!input.imageUrl?.trim()) {
+          throw new Error('Krea 2 Turbo Style requires a source image');
+        }
+        return submitToFal(endpoint, { ...buildKreaInput(input), reference_image_urls: [input.imageUrl] }, apiKey);
+      default:
+        return submitToFal(endpoint, input.imageUrl ? buildKontextInput(input) : buildFluxInput(input), apiKey);
+    }
+  },
 
   async pollImage(endpoint, requestId, apiKey): Promise<ProviderImagePollResult> {
     const { status, completed, result, logs } = await resultFromFal(endpoint, requestId, apiKey, (data) => {

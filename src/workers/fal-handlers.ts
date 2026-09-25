@@ -142,8 +142,7 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   const provider = getImageProvider(modelConfig.provider);
   const apiKey = await resolveProviderKey(modelConfig.provider, job);
 
-  // Image-to-image models (e.g. Kontext) require a source image. Resolve the
-  // source dream UUID (or URL) to a real image URL for the provider.
+  // Resolve source images for editing (Kontext) or style references (Krea).
   let sourceImageUrl: string | undefined;
   if (modelConfig.inputImage) {
     const sourceRef = job.data.source_dream_uuid;
@@ -292,7 +291,10 @@ async function logFalSubmission(
 
 function redactUrls(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [key, key.endsWith('_url') ? '[redacted]' : value])
+    Object.entries(input).map(([key, value]) => [
+      key,
+      key.endsWith('_url') || key.endsWith('_urls') ? '[redacted]' : value,
+    ])
   );
 }
 
