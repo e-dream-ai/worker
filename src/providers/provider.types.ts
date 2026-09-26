@@ -14,7 +14,7 @@ export interface NormalizedImageInput {
   seed?: number;
   numImages?: number;
   numInferenceSteps?: number;
-  imageUrl?: string; // source image for image-to-image models (e.g. Kontext)
+  imageUrl?: string; // source image for editing or a style reference
 }
 
 export interface ProviderSubmitResult {

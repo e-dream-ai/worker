@@ -33,7 +33,7 @@ export interface VideoModelConfig extends BaseModelConfig {
 
 export interface ImageModelConfig extends BaseModelConfig {
   mediaType: 'image';
-  inputImage?: boolean; // model takes a source image (image-to-image, e.g. Kontext)
+  inputImage?: boolean; // model requires a source image (editing or style reference)
 }
 
 export type WorkerModelConfig = VideoModelConfig | ImageModelConfig;
@@ -73,6 +73,19 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     provider: 'fal',
     mediaType: 'image',
     endpoint: 'fal-ai/flux-pro/kontext',
+    inputImage: true,
+  },
+  'krea-2-turbo': {
+    id: 'krea-2-turbo',
+    provider: 'fal',
+    mediaType: 'image',
+    endpoint: 'fal-ai/krea-2/turbo',
+  },
+  'krea-2-turbo-style': {
+    id: 'krea-2-turbo-style',
+    provider: 'fal',
+    mediaType: 'image',
+    endpoint: 'fal-ai/krea-2/turbo/style',
     inputImage: true,
   },
 };
