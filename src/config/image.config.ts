@@ -6,7 +6,7 @@ export interface ImagePreset {
 }
 
 export const IMAGE_PRESETS = {
-  dream: { maxDimension: 4096, quality: 90 },
+  dream: { maxDimension: 4096, quality: 85 },
   thumbnail: { maxDimension: 2048, quality: 85 },
   avatar: { maxDimension: 1024, quality: 85 },
 } as const satisfies Record<ImagePresetName, ImagePreset>;
