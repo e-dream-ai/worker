@@ -15,6 +15,8 @@ import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
 import { R2UploadService } from '../services/r2-upload.service.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
+import { canIngestImageLocally, ingestImageLocally } from '../services/image-ingest.service.js';
+import { UnsupportedLocalImageError } from '../services/image-normalize.service.js';
 
 const statusHandler = new StatusHandlerService();
 const r2UploadService = new R2UploadService();
@@ -139,6 +141,15 @@ export async function handleVideoIngestJob(job: Job): Promise<any> {
 
   if (extension) {
     input.extension = extension;
+  }
+
+  if (type === 'image' && canIngestImageLocally(extension)) {
+    try {
+      return await ingestImageLocally(job);
+    } catch (error) {
+      if (!(error instanceof UnsupportedLocalImageError)) throw error;
+      await job.log(`${new Date().toISOString()}: Local image ingest failed, using RunPod: ${error.message}`);
+    }
   }
 
   const { id: runpodId } = await endpoints.videoingest.run({ input }, 30000);
