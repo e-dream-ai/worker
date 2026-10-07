@@ -25,6 +25,8 @@ import {
   handleDiscoDiffusionJob,
 } from './workers/job-handlers.js';
 import { handleFalVideoJob, handleFalImageJob } from './workers/fal-handlers.js';
+import { handleImageNormalizeJob } from './workers/image-normalize.handler.js';
+import { IMAGE_NORMALIZE_QUEUE } from './config/image.config.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
 WorkerFactory.createWorker('video', handleVideoJob);
@@ -42,6 +44,7 @@ WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
 WorkerFactory.createWorker('discodiffusion', handleDiscoDiffusionJob);
 WorkerFactory.createWorker('falvideo', handleFalVideoJob);
 WorkerFactory.createWorker('falimage', handleFalImageJob);
+WorkerFactory.createWorker(IMAGE_NORMALIZE_QUEUE, handleImageNormalizeJob, env.IMAGE_INGEST_CONCURRENCY);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -171,6 +174,14 @@ const falImageQueue = new Queue('falimage', {
     },
   },
 });
+const imageNormalizeQueue = new Queue(IMAGE_NORMALIZE_QUEUE, {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
 const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
   connection: redisClient,
   streams: {
@@ -204,6 +215,7 @@ createBullBoard({
     new BullMQAdapter(discoDiffusionQueue),
     new BullMQAdapter(falVideoQueue),
     new BullMQAdapter(falImageQueue),
+    new BullMQAdapter(imageNormalizeQueue),
     new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,
