@@ -68,7 +68,7 @@ const backend = axios.create({
 });
 
 export function canIngestImageLocally(extension?: string): boolean {
-  return env.IMAGE_INGEST_LOCAL && !!extension && LOCAL_IMAGE_EXTENSIONS.has(extension.toLowerCase());
+  return !!extension && LOCAL_IMAGE_EXTENSIONS.has(extension.toLowerCase());
 }
 
 async function reportProgress(job: Job<VideoIngestJobData>, status: ProgressStatus, progress: number): Promise<void> {
