@@ -366,7 +366,7 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   return result;
 }
 
-export async function handleUprezVideoJob(job: Job): Promise<any> {
+export async function handleEnhanceVideoJob(job: Job): Promise<any> {
   const {
     video_url,
     video_uuid,
@@ -415,9 +415,9 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     input.video_path = video_path;
   }
 
-  const { id: runpodId } = await endpoints.uprez.run({ input }, 30000);
+  const { id: runpodId } = await endpoints.enhance.run({ input }, 30000);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.enhance, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     await videoServiceClient.uploadGeneratedVideo(
@@ -427,7 +427,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
       getJobRunContext(job)
     );
   } else if (dream_uuid) {
-    console.error(`[handleUprezVideoJob] Upload skipped for dream ${dream_uuid}:`, {
+    console.error(`[handleEnhanceVideoJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
       auto_upload,
       has_r2_url: !!result?.r2_url,
