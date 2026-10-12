@@ -13,7 +13,7 @@ import {
   handleVideoJob,
   handleHunyuanVideoJob,
   handleDeforumVideoJob,
-  handleUprezVideoJob,
+  handleEnhanceVideoJob,
   handleWanT2VJob,
   handleWanI2VJob,
   handleWanI2VLoraJob,
@@ -32,7 +32,7 @@ WorkerFactory.createWorker('image', handleImageJob);
 WorkerFactory.createWorker('video', handleVideoJob);
 WorkerFactory.createWorker('hunyuanvideo', handleHunyuanVideoJob);
 WorkerFactory.createWorker('deforumvideo', handleDeforumVideoJob);
-WorkerFactory.createWorker('uprezvideo', handleUprezVideoJob);
+WorkerFactory.createWorker('enhancevideo', handleEnhanceVideoJob);
 WorkerFactory.createWorker('want2v', handleWanT2VJob);
 WorkerFactory.createWorker('wani2v', handleWanI2VJob);
 WorkerFactory.createWorker('wani2vlora', handleWanI2VLoraJob);
@@ -78,7 +78,7 @@ const imageQueue = new Queue('image', {
     },
   },
 });
-const uprezVideoQueue = new Queue('uprezvideo', {
+const enhanceVideoQueue = new Queue('enhancevideo', {
   connection: redisClient,
   streams: {
     events: {
@@ -203,7 +203,7 @@ createBullBoard({
     new BullMQAdapter(animatediffVideoQueue),
     new BullMQAdapter(imageQueue),
     new BullMQAdapter(deforumQueue),
-    new BullMQAdapter(uprezVideoQueue),
+    new BullMQAdapter(enhanceVideoQueue),
     new BullMQAdapter(wanT2VQueue),
     new BullMQAdapter(wanI2VQueue),
     new BullMQAdapter(wanI2VLoraQueue),

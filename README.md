@@ -17,7 +17,7 @@ There are two ways to use this project:
 
    - `node dist/prompt.js prompt/deforum-fish.json` (creates `prompt/deforum-fish.mp4`)
    - `node dist/prompt.js prompt/animatediff-dog.json` (creates `prompt/animatediff-dog.mp4`)
-   - `node dist/prompt.js prompt/uprez-example.json` (creates `prompt/uprez-example.mp4`)
+   - `node dist/prompt.js prompt/enhance-example.json` (creates `prompt/enhance-example.mp4`)
    - By default, output files are saved alongside the input JSON with a `.mp4` extension
    - Use `-o` to specify a custom output path: `node dist/prompt.js prompt/deforum-fish.json -o my-custom-name.mp4`
 
@@ -43,7 +43,7 @@ Required env vars (local development)
 
 ```bash
 node dist/prompt.js prompt/animatediff-dog.json -o ./out/dog.mp4
-node dist/prompt.js prompt/uprez-example.json -o ./out/uprez.mp4
+node dist/prompt.js prompt/enhance-example.json -o ./out/enhance.mp4
 node dist/prompt.js prompt/deforum-fish.json -o ./out/deforum.mp4
 ```
 

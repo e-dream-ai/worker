@@ -29,7 +29,7 @@ export class CLIService {
     video: this.createQueueConfig('video'),
     hunyuanvideo: this.createQueueConfig('hunyuanvideo'),
     deforumvideo: this.createQueueConfig('deforumvideo'),
-    uprezvideo: this.createQueueConfig('uprezvideo'),
+    enhancevideo: this.createQueueConfig('enhancevideo'),
     want2v: this.createQueueConfig('want2v'),
     wani2v: this.createQueueConfig('wani2v'),
     wani2vlora: this.createQueueConfig('wani2vlora'),
@@ -66,7 +66,7 @@ export class CLIService {
 
     if (!algorithm) {
       throw new InvalidArgumentError(
-        "Missing 'infinidream_algorithm'. Allowed values: animatediff, hunyuan, deforum, uprez, wan-t2v, wan-i2v, wan-i2v-lora, qwen-image, z-image-turbo, ltx-i2v, nvidia-uprez"
+        "Missing 'infinidream_algorithm'. Allowed values: animatediff, hunyuan, deforum, enhance, wan-t2v, wan-i2v, wan-i2v-lora, qwen-image, z-image-turbo, ltx-i2v, nvidia-uprez"
       );
     }
 
@@ -77,8 +77,8 @@ export class CLIService {
         return 'hunyuanvideo';
       case 'deforum':
         return 'deforumvideo';
-      case 'uprez':
-        return 'uprezvideo';
+      case 'enhance':
+        return 'enhancevideo';
       case 'wan-t2v':
         return 'want2v';
       case 'wan-i2v':
@@ -95,7 +95,7 @@ export class CLIService {
         return 'nvidiavsr';
       default:
         throw new InvalidArgumentError(
-          `Unknown 'infinidream_algorithm': ${algorithm}. Allowed values: animatediff, hunyuan, deforum, uprez, wan-t2v, wan-i2v, wan-i2v-lora, qwen-image, z-image-turbo, ltx-i2v, nvidia-uprez`
+          `Unknown 'infinidream_algorithm': ${algorithm}. Allowed values: animatediff, hunyuan, deforum, enhance, wan-t2v, wan-i2v, wan-i2v-lora, qwen-image, z-image-turbo, ltx-i2v, nvidia-uprez`
         );
     }
   }

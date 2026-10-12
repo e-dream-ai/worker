@@ -8,7 +8,9 @@ export const endpoints = {
   animatediff: runpod.endpoint(env.RUNPOD_ANIMATEDIFF_ENDPOINT_ID),
   hunyuan: runpod.endpoint(env.RUNPOD_HUNYUAN_ENDPOINT_ID),
   deforum: runpod.endpoint(env.RUNPOD_DEFORUM_ENDPOINT_ID),
-  uprez: runpod.endpoint(env.RUNPOD_UPREZ_ENDPOINT_ID),
+  // The RunPod endpoint and its env var keep the gpu-container-uprez name;
+  // only the algorithm was renamed to enhance.
+  enhance: runpod.endpoint(env.RUNPOD_UPREZ_ENDPOINT_ID),
   ltxI2V: runpod.endpoint(env.RUNPOD_LTX_ENDPOINT_ID),
   nvidiaVsr: runpod.endpoint(env.RUNPOD_NVIDIA_SR_ENDPOINT_ID),
   videoingest: runpod.endpoint(env.RUNPOD_VIDEOINGEST_ENDPOINT_ID),
