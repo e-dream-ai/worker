@@ -32,7 +32,10 @@
     "express": "^4.21.2",
     "express-basic-auth": "^1.2.1",
     "multer": "^2.0.2",
+    "p-limit": "^7.3.3",
+    "p-retry": "^8.0.1",
     "runpod-sdk": "^1.0.7",
+    "sharp": "^0.35.5",
     "ts-toolbelt": "^9.6.0",
     "undici": "^7.18.2"
   },

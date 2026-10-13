@@ -37,6 +37,8 @@ export const env = cleanEnv(process.env, {
   R2_IMAGE_DIRECTORY: str({ default: 'image-inputs' }),
   R2_PRESIGNED_EXPIRY: str({ default: '86400' }),
 
+  IMAGE_INGEST_CONCURRENCY: num({ default: 2 }),
+
   WORKER_URL: str({ default: 'http://localhost:3000' }),
   VIDEO_SERVICE_URL: str({ default: 'http://localhost:5000' }),
   VIDEO_SERVICE_API_KEY: str({ default: '' }),

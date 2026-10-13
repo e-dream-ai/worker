@@ -13,7 +13,7 @@ import {
   handleVideoJob,
   handleHunyuanVideoJob,
   handleDeforumVideoJob,
-  handleUprezVideoJob,
+  handleEnhanceVideoJob,
   handleWanT2VJob,
   handleWanI2VJob,
   handleWanI2VLoraJob,
@@ -25,12 +25,14 @@ import {
   handleDiscoDiffusionJob,
 } from './workers/job-handlers.js';
 import { handleFalVideoJob, handleFalImageJob } from './workers/fal-handlers.js';
+import { handleImageNormalizeJob } from './workers/image-normalize.handler.js';
+import { IMAGE_NORMALIZE_QUEUE } from './config/image.config.js';
 
 WorkerFactory.createWorker('image', handleImageJob);
 WorkerFactory.createWorker('video', handleVideoJob);
 WorkerFactory.createWorker('hunyuanvideo', handleHunyuanVideoJob);
 WorkerFactory.createWorker('deforumvideo', handleDeforumVideoJob);
-WorkerFactory.createWorker('uprezvideo', handleUprezVideoJob);
+WorkerFactory.createWorker('enhancevideo', handleEnhanceVideoJob);
 WorkerFactory.createWorker('want2v', handleWanT2VJob);
 WorkerFactory.createWorker('wani2v', handleWanI2VJob);
 WorkerFactory.createWorker('wani2vlora', handleWanI2VLoraJob);
@@ -42,6 +44,7 @@ WorkerFactory.createWorker('videoingest', handleVideoIngestJob);
 WorkerFactory.createWorker('discodiffusion', handleDiscoDiffusionJob);
 WorkerFactory.createWorker('falvideo', handleFalVideoJob);
 WorkerFactory.createWorker('falimage', handleFalImageJob);
+WorkerFactory.createWorker(IMAGE_NORMALIZE_QUEUE, handleImageNormalizeJob, env.IMAGE_INGEST_CONCURRENCY);
 
 const deforumQueue = new Queue('deforumvideo', {
   connection: redisClient,
@@ -75,7 +78,7 @@ const imageQueue = new Queue('image', {
     },
   },
 });
-const uprezVideoQueue = new Queue('uprezvideo', {
+const enhanceVideoQueue = new Queue('enhancevideo', {
   connection: redisClient,
   streams: {
     events: {
@@ -171,6 +174,14 @@ const falImageQueue = new Queue('falimage', {
     },
   },
 });
+const imageNormalizeQueue = new Queue(IMAGE_NORMALIZE_QUEUE, {
+  connection: redisClient,
+  streams: {
+    events: {
+      maxLen: 100,
+    },
+  },
+});
 const marketingQueue = new Queue(env.MARKETING_QUEUE_NAME, {
   connection: redisClient,
   streams: {
@@ -192,7 +203,7 @@ createBullBoard({
     new BullMQAdapter(animatediffVideoQueue),
     new BullMQAdapter(imageQueue),
     new BullMQAdapter(deforumQueue),
-    new BullMQAdapter(uprezVideoQueue),
+    new BullMQAdapter(enhanceVideoQueue),
     new BullMQAdapter(wanT2VQueue),
     new BullMQAdapter(wanI2VQueue),
     new BullMQAdapter(wanI2VLoraQueue),
@@ -204,6 +215,7 @@ createBullBoard({
     new BullMQAdapter(discoDiffusionQueue),
     new BullMQAdapter(falVideoQueue),
     new BullMQAdapter(falImageQueue),
+    new BullMQAdapter(imageNormalizeQueue),
     new BullMQAdapter(marketingQueue),
   ],
   serverAdapter: serverAdapter,

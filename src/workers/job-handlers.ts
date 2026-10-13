@@ -15,6 +15,8 @@ import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
 import { R2UploadService } from '../services/r2-upload.service.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
+import { canIngestImageLocally, ingestImageLocally } from '../services/image-ingest.service.js';
+import { UnsupportedLocalImageError } from '../services/image-normalize.service.js';
 
 const statusHandler = new StatusHandlerService();
 const r2UploadService = new R2UploadService();
@@ -139,6 +141,15 @@ export async function handleVideoIngestJob(job: Job): Promise<any> {
 
   if (extension) {
     input.extension = extension;
+  }
+
+  if (type === 'image' && canIngestImageLocally(extension)) {
+    try {
+      return await ingestImageLocally(job);
+    } catch (error) {
+      if (!(error instanceof UnsupportedLocalImageError)) throw error;
+      await job.log(`${new Date().toISOString()}: Local image ingest failed, using RunPod: ${error.message}`);
+    }
   }
 
   const { id: runpodId } = await endpoints.videoingest.run({ input }, 30000);
@@ -355,7 +366,7 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
   return result;
 }
 
-export async function handleUprezVideoJob(job: Job): Promise<any> {
+export async function handleEnhanceVideoJob(job: Job): Promise<any> {
   const {
     video_url,
     video_uuid,
@@ -404,9 +415,9 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
     input.video_path = video_path;
   }
 
-  const { id: runpodId } = await endpoints.uprez.run({ input }, 30000);
+  const { id: runpodId } = await endpoints.enhance.run({ input }, 30000);
   await job.updateData({ ...job.data, runpod_id: runpodId });
-  const result = await statusHandler.handleStatus(endpoints.uprez, runpodId, job);
+  const result = await statusHandler.handleStatus(endpoints.enhance, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
     await videoServiceClient.uploadGeneratedVideo(
@@ -416,7 +427,7 @@ export async function handleUprezVideoJob(job: Job): Promise<any> {
       getJobRunContext(job)
     );
   } else if (dream_uuid) {
-    console.error(`[handleUprezVideoJob] Upload skipped for dream ${dream_uuid}:`, {
+    console.error(`[handleEnhanceVideoJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
       auto_upload,
       has_r2_url: !!result?.r2_url,
