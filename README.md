@@ -74,6 +74,20 @@ The [engines](https://github.com/e-dream-ai/engines) repo has a JSON config and 
 3. Bull Board (log in as `admin` with `ADMIN_PASS`):
    - stage: https://gpu-worker-0ac312b41451.herokuapp.com/admin/queues/
    - alpha: https://gpu-worker-prod-8775591876d9.herokuapp.com/admin/queues
+4. To check RunPod worker limits or find out why jobs aren't running, use the [RunPod endpoints CLI](#runpod-endpoints-cli).
+
+## RunPod endpoints CLI
+
+Lists every serverless endpoint on the RunPod account (alpha and stage) with its worker limits, live workers, queue and GPU stock, plus the account totals. It also points out likely reasons jobs are waiting and lets you change an endpoint's max workers from a menu. It needs `RUNPOD_API_KEY` in `worker/.env` and builds the worker before it runs.
+
+```bash
+npm run runpod             # status, then the menu
+npm run runpod -- --once   # status only
+```
+
+- To change an endpoint, pick **Change max workers on an endpoint**, choose the endpoint (type to filter), enter the new max and confirm. Nothing changes until you confirm.
+- **Total max workers** adds up every endpoint's max and compares it with the account cap. Raise the cap in the RunPod console.
+- Columns: `RUN` workers busy with a job, `IDLE` workers ready for one, `INIT` workers starting, `THRTL` workers waiting for a free GPU, `UNHLTH` workers failing health checks, `QUEUE` jobs waiting. `GPU STOCK` is the best serverless availability across the endpoint's GPU pools.
 
 ## Marketing Email CLI
 
