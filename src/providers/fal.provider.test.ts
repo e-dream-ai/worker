@@ -81,6 +81,48 @@ describe('fal image submission', () => {
     });
   });
 
+  test.each([true, false])('passes Krea prompt expansion through when set (%s)', async (promptExpansion) => {
+    await falImageProvider.submitImage('fal-ai/krea-2/turbo', { prompt: 'glowing', promptExpansion }, 'test-key');
+    expect(submit).toHaveBeenCalledWith('fal-ai/krea-2/turbo', {
+      input: { prompt: 'glowing', num_images: 1, enable_prompt_expansion: promptExpansion },
+    });
+  });
+
+  test('submits Krea Style with style scale and prompt expansion', async () => {
+    await falImageProvider.submitImage(
+      'fal-ai/krea-2/turbo/style',
+      { prompt: 'glowing', imageUrl: 'https://r2/style.png', styleScale: 2.5, promptExpansion: true },
+      'test-key'
+    );
+    expect(submit).toHaveBeenCalledWith('fal-ai/krea-2/turbo/style', {
+      input: {
+        prompt: 'glowing',
+        num_images: 1,
+        enable_prompt_expansion: true,
+        reference_image_urls: ['https://r2/style.png'],
+        style_scale: 2.5,
+      },
+    });
+  });
+
+  test.each([-0.1, 4.1, Number.NaN])('rejects Krea style scale %s before submitting', async (styleScale) => {
+    await expect(
+      falImageProvider.submitImage(
+        'fal-ai/krea-2/turbo/style',
+        { prompt: 'glowing', imageUrl: 'https://r2/style.png', styleScale },
+        'test-key'
+      )
+    ).rejects.toThrow(/style_scale/);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  test('ignores style scale on plain Krea Turbo', async () => {
+    await falImageProvider.submitImage('fal-ai/krea-2/turbo', { prompt: 'glowing', styleScale: 2 }, 'test-key');
+    expect(submit).toHaveBeenCalledWith('fal-ai/krea-2/turbo', {
+      input: { prompt: 'glowing', num_images: 1 },
+    });
+  });
+
   test('rejects a missing Krea style reference before submitting', async () => {
     await expect(
       falImageProvider.submitImage('fal-ai/krea-2/turbo/style', { prompt: 'glowing' }, 'test-key')

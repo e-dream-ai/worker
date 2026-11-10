@@ -15,6 +15,8 @@ export interface NormalizedImageInput {
   numImages?: number;
   numInferenceSteps?: number;
   imageUrl?: string; // source image for editing or a style reference
+  promptExpansion?: boolean; // Krea: fal rewrites the prompt with an LLM before generating
+  styleScale?: number; // Krea Style: strength of the style reference, 0-4
 }
 
 export interface ProviderSubmitResult {
