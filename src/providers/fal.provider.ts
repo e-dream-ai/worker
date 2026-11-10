@@ -175,6 +175,26 @@ function buildKreaInput(input: NormalizedImageInput): Record<string, unknown> {
   if (typeof input.seed === 'number' && input.seed >= 0) {
     body.seed = input.seed;
   }
+  if (typeof input.promptExpansion === 'boolean') {
+    body.enable_prompt_expansion = input.promptExpansion;
+  }
+  return body;
+}
+
+const KREA_STYLE_SCALE_RANGE = { min: 0, max: 4 } as const;
+
+function buildKreaStyleInput(input: NormalizedImageInput): Record<string, unknown> {
+  if (!input.imageUrl?.trim()) {
+    throw new Error('Krea 2 Turbo Style requires a source image');
+  }
+  const body: Record<string, unknown> = { ...buildKreaInput(input), reference_image_urls: [input.imageUrl] };
+  if (input.styleScale !== undefined) {
+    const { min, max } = KREA_STYLE_SCALE_RANGE;
+    if (!Number.isFinite(input.styleScale) || input.styleScale < min || input.styleScale > max) {
+      throw new Error(`Krea 2 Turbo Style style_scale must be between ${min} and ${max}`);
+    }
+    body.style_scale = input.styleScale;
+  }
   return body;
 }
 
@@ -186,10 +206,7 @@ export const falImageProvider: ImageProvider = {
       case 'fal-ai/krea-2/turbo':
         return submitToFal(endpoint, buildKreaInput(input), apiKey);
       case 'fal-ai/krea-2/turbo/style':
-        if (!input.imageUrl?.trim()) {
-          throw new Error('Krea 2 Turbo Style requires a source image');
-        }
-        return submitToFal(endpoint, { ...buildKreaInput(input), reference_image_urls: [input.imageUrl] }, apiKey);
+        return submitToFal(endpoint, buildKreaStyleInput(input), apiKey);
       default:
         return submitToFal(endpoint, input.imageUrl ? buildKontextInput(input) : buildFluxInput(input), apiKey);
     }
