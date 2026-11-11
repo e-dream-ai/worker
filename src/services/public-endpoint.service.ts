@@ -21,6 +21,17 @@ export interface RunJobInput {
   [key: string]: unknown;
 }
 
+export class RunpodHttpError extends Error {
+  override readonly name = 'RunpodHttpError';
+
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+  }
+}
+
 export class PublicEndpointService {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -118,7 +129,10 @@ export class PublicEndpointService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        const error = new Error(`Failed to get job status: ${response.status} ${response.statusText}. ${errorText}`);
+        const error = new RunpodHttpError(
+          `Failed to get job status: ${response.status} ${response.statusText}. ${errorText}`,
+          response.status
+        );
         console.error('[PublicEndpointService.status]', {
           endpoint: this.baseUrl,
           jobId,
