@@ -8,6 +8,12 @@ type JobHandler = (job: any) => Promise<any>;
 const videoServiceClient = new VideoServiceClient();
 
 export class WorkerFactory {
+  private static readonly workers: Worker[] = [];
+
+  static async closeAll(): Promise<void> {
+    await Promise.all(WorkerFactory.workers.map((worker) => worker.close()));
+  }
+
   static createWorker(name: string, handler: JobHandler, concurrency: number = 20): Worker {
     const worker = new Worker(name, handler, {
       connection: redisClient,
@@ -15,6 +21,7 @@ export class WorkerFactory {
       lockDuration: 60000, // 60 seconds
       maxStalledCount: 2,
     });
+    WorkerFactory.workers.push(worker);
 
     worker.on('failed', async (job, error: Error) => {
       const serializedError = this.serializeError(error);

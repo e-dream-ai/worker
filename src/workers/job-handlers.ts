@@ -13,6 +13,7 @@ import { readFileSync } from 'fs';
 import { existsSync } from 'fs';
 import { endpoints } from '../config/runpod.config.js';
 import { StatusHandlerService } from '../services/status-handler.service.js';
+import { submitOrResumeRunpodJob } from '../services/runpod-job.service.js';
 import { R2UploadService } from '../services/r2-upload.service.js';
 import { VideoServiceClient } from '../services/video-service.client.js';
 import { canIngestImageLocally, ingestImageLocally } from '../services/image-ingest.service.js';
@@ -152,8 +153,7 @@ export async function handleVideoIngestJob(job: Job): Promise<any> {
     }
   }
 
-  const { id: runpodId } = await endpoints.videoingest.run({ input }, 30000);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.videoingest, { input }, 30000);
   return statusHandler.handleStatus(endpoints.videoingest, runpodId, job);
 }
 
@@ -161,7 +161,9 @@ export async function handleImageJob(job: Job): Promise<any> {
   const { prompt = 'A walk in the park', seed = 1337, steps = 20, width = 512, height = 512 } = job.data;
   const filenamePrefix = String(job.id);
 
-  const { id: runpodId } = await endpoints.animatediff.run(
+  const runpodId = await submitOrResumeRunpodJob(
+    job,
+    endpoints.animatediff,
     {
       input: {
         workflow: {
@@ -209,8 +211,6 @@ export async function handleImageJob(job: Job): Promise<any> {
     },
     30000
   );
-
-  await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
 }
 
@@ -238,7 +238,9 @@ export async function handleVideoJob(job: Job): Promise<any> {
   const prompt = promptsJson.substring(1, promptsJson.length - 1);
   const filenamePrefix = String(job.id);
 
-  const { id: runpodId } = await endpoints.animatediff.run(
+  const runpodId = await submitOrResumeRunpodJob(
+    job,
+    endpoints.animatediff,
     {
       input: {
         workflow: createAnimatediffWorkflow({
@@ -258,8 +260,6 @@ export async function handleVideoJob(job: Job): Promise<any> {
     },
     30000
   );
-
-  await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.animatediff, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -300,7 +300,9 @@ export async function handleHunyuanVideoJob(job: Job): Promise<any> {
 
   const filenamePrefix = String(job.id);
 
-  const { id: runpodId } = await endpoints.hunyuan.run(
+  const runpodId = await submitOrResumeRunpodJob(
+    job,
+    endpoints.hunyuan,
     {
       input: {
         workflow: createHunyuanWorkflow({
@@ -317,8 +319,6 @@ export async function handleHunyuanVideoJob(job: Job): Promise<any> {
     },
     30000
   );
-
-  await job.updateData({ ...job.data, runpod_id: runpodId });
   return statusHandler.handleStatus(endpoints.hunyuan, runpodId, job);
 }
 
@@ -335,7 +335,9 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
     }
   }
 
-  const { id: runpodId } = await endpoints.deforum.run(
+  const runpodId = await submitOrResumeRunpodJob(
+    job,
+    endpoints.deforum,
     {
       input: {
         settings: {
@@ -350,8 +352,6 @@ export async function handleDeforumVideoJob(job: Job): Promise<any> {
     },
     30000
   );
-
-  await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.deforum, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -415,8 +415,7 @@ export async function handleEnhanceVideoJob(job: Job): Promise<any> {
     input.video_path = video_path;
   }
 
-  const { id: runpodId } = await endpoints.enhance.run({ input }, 30000);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.enhance, { input }, 30000);
   const result = await statusHandler.handleStatus(endpoints.enhance, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -496,8 +495,7 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
     input.max_tokens = max_tokens;
   }
 
-  const { id: runpodId } = await endpoints.wanT2V.run(input);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanT2V, input);
   const result = await statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -583,8 +581,7 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
     input.max_tokens = max_tokens;
   }
 
-  const { id: runpodId } = await endpoints.wanI2V.run(input);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanI2V, input);
   const result = await statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -861,8 +858,7 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
     }
   }
 
-  const { id: runpodId } = await endpoints.wanI2VLora.run(input);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanI2VLora, input);
   const result = await statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -914,8 +910,7 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
     input.size = size;
   }
 
-  const { id: runpodId } = await endpoints.qwenImage.run(input);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.qwenImage, input);
   const result = await statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -990,8 +985,7 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
     throw new Error(`output_format must be one of: ${VALID_OUTPUT_FORMATS.join(', ')}`);
   }
 
-  const { id: runpodId } = await endpoints.zImageTurbo.run(input);
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.zImageTurbo, input);
   const result = await statusHandler.handleStatus(endpoints.zImageTurbo, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -1118,14 +1112,14 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     images.push({ name: 'end_frame.png', image: resolvedEndImage });
   }
 
-  const { id: runpodId } = await endpoints.ltxI2V.run(
+  const runpodId = await submitOrResumeRunpodJob(
+    job,
+    endpoints.ltxI2V,
     {
       input: { workflow, images },
     },
     30000
   );
-
-  await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.ltxI2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -1172,13 +1166,14 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
       ? video_url
       : await resolveUrlFromDreamUuid(video_url || video_uuid!);
 
-  const { id: runpodId } = await endpoints.nvidiaVsr.run(
+  const runpodId = await submitOrResumeRunpodJob(
+    job,
+    endpoints.nvidiaVsr,
     {
       input: { video_url: resolvedUrl, scale: upscale_factor, quality },
     },
     30000
   );
-  await job.updateData({ ...job.data, runpod_id: runpodId });
   const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -1812,8 +1807,7 @@ export async function handleDiscoDiffusionJob(job: Job): Promise<any> {
     settings: source_dream_uuid ? { ...settings, source_dream_uuid } : settings,
   };
 
-  const { id: runpodId } = await endpoints.discoDiffusion.run({ input });
-  await job.updateData({ ...job.data, runpod_id: runpodId });
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.discoDiffusion, { input });
   const result = await statusHandler.handleStatus(endpoints.discoDiffusion, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {

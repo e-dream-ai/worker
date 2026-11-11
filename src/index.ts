@@ -239,3 +239,11 @@ app.listen(env.PORT, () => {
   console.log(`Running on port ${env.PORT} in ${env.NODE_ENV} mode...`);
   console.log(`Admin UI: http://localhost:${env.PORT}/admin/queues`);
 });
+
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, async () => {
+    console.log(`${signal} received, closing workers. Jobs still running are resumed after the restart.`);
+    await WorkerFactory.closeAll();
+    process.exit(0);
+  });
+}
