@@ -495,7 +495,7 @@ export async function handleWanT2VJob(job: Job): Promise<any> {
     input.max_tokens = max_tokens;
   }
 
-  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanT2V, input);
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanT2V, { input });
   const result = await statusHandler.handleStatus(endpoints.wanT2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -581,7 +581,7 @@ export async function handleWanI2VJob(job: Job): Promise<any> {
     input.max_tokens = max_tokens;
   }
 
-  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanI2V, input);
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanI2V, { input });
   const result = await statusHandler.handleStatus(endpoints.wanI2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -858,7 +858,7 @@ export async function handleWanI2VLoraJob(job: Job): Promise<any> {
     }
   }
 
-  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanI2VLora, input);
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.wanI2VLora, { input });
   const result = await statusHandler.handleStatus(endpoints.wanI2VLora, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -910,7 +910,7 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
     input.size = size;
   }
 
-  const runpodId = await submitOrResumeRunpodJob(job, endpoints.qwenImage, input);
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.qwenImage, { input });
   const result = await statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -985,7 +985,7 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
     throw new Error(`output_format must be one of: ${VALID_OUTPUT_FORMATS.join(', ')}`);
   }
 
-  const runpodId = await submitOrResumeRunpodJob(job, endpoints.zImageTurbo, input);
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.zImageTurbo, { input });
   const result = await statusHandler.handleStatus(endpoints.zImageTurbo, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -1112,14 +1112,7 @@ export async function handleLtxI2VJob(job: Job): Promise<any> {
     images.push({ name: 'end_frame.png', image: resolvedEndImage });
   }
 
-  const runpodId = await submitOrResumeRunpodJob(
-    job,
-    endpoints.ltxI2V,
-    {
-      input: { workflow, images },
-    },
-    30000
-  );
+  const runpodId = await submitOrResumeRunpodJob(job, endpoints.ltxI2V, { input: { workflow, images } }, 30000);
   const result = await statusHandler.handleStatus(endpoints.ltxI2V, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
@@ -1169,9 +1162,7 @@ export async function handleNvidiaVsrJob(job: Job): Promise<any> {
   const runpodId = await submitOrResumeRunpodJob(
     job,
     endpoints.nvidiaVsr,
-    {
-      input: { video_url: resolvedUrl, scale: upscale_factor, quality },
-    },
+    { input: { video_url: resolvedUrl, scale: upscale_factor, quality } },
     30000
   );
   const result = await statusHandler.handleStatus(endpoints.nvidiaVsr, runpodId, job);

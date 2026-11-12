@@ -1,12 +1,22 @@
 import type { Job } from 'bullmq';
 import pRetry, { AbortError } from 'p-retry';
+import type { ExecutionPolicy } from 'runpod-sdk';
 
-export interface RunpodEndpoint<Payload> {
+export interface RunpodJobRequest {
+  readonly input: unknown;
+  readonly policy?: ExecutionPolicy;
+}
+
+export interface RunpodEndpoint<Payload extends RunpodJobRequest> {
   run(payload: Payload, timeoutMs?: number): Promise<{ readonly id: string }>;
   status(runpodId: string): Promise<{ readonly status?: string }>;
 }
 
-const ENDED_WITHOUT_RESULT: ReadonlySet<string> = new Set(['FAILED', 'CANCELLED', 'TIMED_OUT']);
+const RUNPOD_JOB_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+
+const RUNPOD_JOB_POLICY = { ttl: RUNPOD_JOB_TTL_MS } as const satisfies ExecutionPolicy;
+
+export const RUNPOD_FAILURE_STATUSES: ReadonlySet<string> = new Set(['FAILED', 'CANCELLED', 'TIMED_OUT']);
 const UNKNOWN_JOB_HTTP_STATUSES: ReadonlySet<number> = new Set([400, 404]);
 const RETRYABLE_CLIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([408, 429]);
 const STATUS_LOOKUP_RETRIES = 4;
@@ -26,7 +36,12 @@ function httpStatusOf(error: unknown): number | undefined {
   return undefined;
 }
 
-function lookUpStatus<Payload>(endpoint: RunpodEndpoint<Payload>, runpodId: string): Promise<string | null> {
+export const isRunpodJobNotFound = (error: unknown): boolean => httpStatusOf(error) === 404;
+
+function lookUpStatus<Payload extends RunpodJobRequest>(
+  endpoint: RunpodEndpoint<Payload>,
+  runpodId: string
+): Promise<string | null> {
   return pRetry(
     async () => {
       try {
@@ -45,7 +60,7 @@ function lookUpStatus<Payload>(endpoint: RunpodEndpoint<Payload>, runpodId: stri
 
 const logToJob = (job: Job, message: string): Promise<number> => job.log(`${new Date().toISOString()}: ${message}`);
 
-export async function submitOrResumeRunpodJob<Payload>(
+export async function submitOrResumeRunpodJob<Payload extends RunpodJobRequest>(
   job: Job,
   endpoint: RunpodEndpoint<Payload>,
   payload: NoInfer<Payload>,
@@ -55,7 +70,7 @@ export async function submitOrResumeRunpodJob<Payload>(
 
   if (typeof previousId === 'string' && previousId.length > 0) {
     const status = await lookUpStatus(endpoint, previousId);
-    if (status !== null && !ENDED_WITHOUT_RESULT.has(status)) {
+    if (status !== null && !RUNPOD_FAILURE_STATUSES.has(status)) {
       await logToJob(job, `Resuming RunPod job ${previousId} (${status}) instead of submitting it again`);
       return previousId;
     }
@@ -63,7 +78,7 @@ export async function submitOrResumeRunpodJob<Payload>(
     await logToJob(job, `RunPod job ${previousId} ${reason}, submitting a new one`);
   }
 
-  const { id } = await endpoint.run(payload, timeoutMs);
+  const { id } = await endpoint.run({ ...payload, policy: RUNPOD_JOB_POLICY }, timeoutMs);
   await job.updateData({ ...job.data, runpod_id: id });
   return id;
 }

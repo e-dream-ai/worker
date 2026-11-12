@@ -19,7 +19,7 @@ export class WorkerFactory {
       connection: redisClient,
       concurrency,
       lockDuration: 60000, // 60 seconds
-      maxStalledCount: 2,
+      maxStalledCount: 5,
     });
     WorkerFactory.workers.push(worker);
 
