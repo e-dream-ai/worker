@@ -136,6 +136,7 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
     num_inference_steps,
     enable_prompt_expansion,
     style_scale,
+    creativity,
     infinidream_algorithm,
     dream_uuid,
     auto_upload = true,
@@ -169,6 +170,7 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
     numInferenceSteps: typeof num_inference_steps === 'number' ? num_inference_steps : undefined,
     promptExpansion: typeof enable_prompt_expansion === 'boolean' ? enable_prompt_expansion : undefined,
     styleScale: typeof style_scale === 'number' ? style_scale : undefined,
+    creativity: typeof creativity === 'string' ? creativity : undefined,
     numImages: 1,
     imageUrl: sourceImageUrl,
   };
