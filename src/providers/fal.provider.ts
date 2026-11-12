@@ -132,6 +132,8 @@ export const falVideoProvider: VideoProvider = {
   cancel: cancelFal,
 };
 
+const isSeed = (seed: number | undefined): seed is number => seed !== undefined && Number.isInteger(seed) && seed >= 0;
+
 function buildFluxInput(input: NormalizedImageInput): Record<string, unknown> {
   const body: Record<string, unknown> = {
     prompt: input.prompt,
@@ -140,7 +142,7 @@ function buildFluxInput(input: NormalizedImageInput): Record<string, unknown> {
   if (typeof input.width === 'number' && typeof input.height === 'number') {
     body.image_size = { width: input.width, height: input.height };
   }
-  if (typeof input.seed === 'number' && input.seed >= 0) {
+  if (isSeed(input.seed)) {
     body.seed = input.seed;
   }
   if (typeof input.numInferenceSteps === 'number') {
@@ -158,7 +160,7 @@ export function buildKontextInput(input: NormalizedImageInput): Record<string, u
     image_url: input.imageUrl,
     num_images: input.numImages ?? 1,
   };
-  if (typeof input.seed === 'number' && input.seed >= 0) {
+  if (isSeed(input.seed)) {
     body.seed = input.seed;
   }
   return body;
@@ -172,7 +174,7 @@ function buildKreaInput(input: NormalizedImageInput): Record<string, unknown> {
   if (typeof input.width === 'number' && typeof input.height === 'number') {
     body.image_size = { width: input.width, height: input.height };
   }
-  if (typeof input.seed === 'number' && input.seed >= 0) {
+  if (isSeed(input.seed)) {
     body.seed = input.seed;
   }
   if (typeof input.promptExpansion === 'boolean') {
@@ -211,29 +213,40 @@ const KREA_V2_ASPECT_RATIOS = [
   { name: '9:16', ratio: 9 / 16 },
 ] as const;
 
+type KreaAspectRatio = (typeof KREA_V2_ASPECT_RATIOS)[number]['name'];
+
 const KREA_V2_CREATIVITY = ['raw', 'low', 'medium', 'high'] as const;
 
-export function nearestKreaAspectRatio(width: number, height: number): string {
+type KreaCreativity = (typeof KREA_V2_CREATIVITY)[number];
+
+type KreaV2Input = {
+  prompt: string;
+  aspect_ratio?: KreaAspectRatio;
+  seed?: number;
+  creativity?: KreaCreativity;
+};
+
+const isKreaCreativity = (value: string): value is KreaCreativity =>
+  (KREA_V2_CREATIVITY as readonly string[]).includes(value);
+
+export function nearestKreaAspectRatio(width: number, height: number): KreaAspectRatio {
   const target = Math.log(width / height);
-  let best: (typeof KREA_V2_ASPECT_RATIOS)[number] = KREA_V2_ASPECT_RATIOS[0];
-  for (const candidate of KREA_V2_ASPECT_RATIOS) {
-    if (Math.abs(Math.log(candidate.ratio) - target) < Math.abs(Math.log(best.ratio) - target)) {
-      best = candidate;
-    }
-  }
-  return best.name;
+  const distance = (ratio: number) => Math.abs(Math.log(ratio) - target);
+  return KREA_V2_ASPECT_RATIOS.reduce((best, candidate) =>
+    distance(candidate.ratio) < distance(best.ratio) ? candidate : best
+  ).name;
 }
 
-function buildKreaV2Input(input: NormalizedImageInput): Record<string, unknown> {
-  const body: Record<string, unknown> = { prompt: input.prompt };
+function buildKreaV2Input(input: NormalizedImageInput): KreaV2Input {
+  const body: KreaV2Input = { prompt: input.prompt };
   if (typeof input.width === 'number' && typeof input.height === 'number' && input.width > 0 && input.height > 0) {
     body.aspect_ratio = nearestKreaAspectRatio(input.width, input.height);
   }
-  if (typeof input.seed === 'number' && input.seed >= 0) {
+  if (isSeed(input.seed)) {
     body.seed = input.seed;
   }
   if (input.creativity !== undefined) {
-    if (!(KREA_V2_CREATIVITY as readonly string[]).includes(input.creativity)) {
+    if (!isKreaCreativity(input.creativity)) {
       throw new Error(`Krea 2 creativity must be one of ${KREA_V2_CREATIVITY.join(', ')}`);
     }
     body.creativity = input.creativity;
