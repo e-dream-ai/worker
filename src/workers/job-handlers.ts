@@ -1,5 +1,5 @@
 import { getJobRunContext } from '../utils/job-progress.js';
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError } from 'bullmq';
 import {
   ImageSize,
   NonEmptyArray,
@@ -22,6 +22,8 @@ import { UnsupportedLocalImageError } from '../services/image-normalize.service.
 const statusHandler = new StatusHandlerService();
 const r2UploadService = new R2UploadService();
 const videoServiceClient = new VideoServiceClient();
+
+const DEFORUM_MAX_FRAMES = 3000;
 
 interface Wan22T2V720Params {
   prompt: string;
@@ -324,6 +326,14 @@ export async function handleHunyuanVideoJob(job: Job): Promise<any> {
 
 export async function handleDeforumVideoJob(job: Job): Promise<any> {
   const { dream_uuid, auto_upload = true, ...promptData } = job.data;
+
+  const maxFrames = Number(promptData.max_frames);
+  if (maxFrames > DEFORUM_MAX_FRAMES) {
+    throw new UnrecoverableError(
+      `Deforum renders are limited to ${DEFORUM_MAX_FRAMES} frames for now (requested ${maxFrames}), longer renders run out of memory`
+    );
+  }
+
   const prompts = {};
   const otherParams = {};
 
