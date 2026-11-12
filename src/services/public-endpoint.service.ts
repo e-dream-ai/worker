@@ -1,3 +1,4 @@
+import type { ExecutionPolicy } from 'runpod-sdk';
 import env from '../shared/env.js';
 
 export interface PublicEndpointResponse {
@@ -21,6 +22,11 @@ export interface RunJobInput {
   [key: string]: unknown;
 }
 
+export interface RunJobRequest {
+  readonly input: RunJobInput;
+  readonly policy?: ExecutionPolicy;
+}
+
 export class RunpodHttpError extends Error {
   override readonly name = 'RunpodHttpError';
 
@@ -41,7 +47,7 @@ export class PublicEndpointService {
     this.apiKey = env.RUNPOD_API_KEY;
   }
 
-  async run(input: RunJobInput): Promise<{ id: string }> {
+  async run(request: RunJobRequest): Promise<{ id: string }> {
     try {
       const response = await fetch(`${this.baseUrl}/run`, {
         method: 'POST',
@@ -49,7 +55,7 @@ export class PublicEndpointService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiKey}`,
         },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify(request),
       });
 
       if (!response.ok) {

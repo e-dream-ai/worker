@@ -3,7 +3,10 @@ import { Job, Queue } from 'bullmq';
 import { PublicEndpointService, PublicEndpointResponse } from './public-endpoint.service.js';
 import { R2UploadService } from './r2-upload.service.js';
 import { RunpodCancelService } from './runpod-cancel.service.js';
+import { isRunpodJobNotFound, RUNPOD_FAILURE_STATUSES } from './runpod-job.service.js';
 import redisClient from '../shared/redis.js';
+
+const MAX_CONSECUTIVE_NOT_FOUND = 3;
 
 interface RunpodStatus {
   status: string;
@@ -80,6 +83,7 @@ export class StatusHandlerService {
     const isPublicEndpoint = endpoint instanceof PublicEndpointService;
     let status: RunpodStatus | undefined;
     let lastLogMessage = '';
+    let consecutiveNotFound = 0;
     const startedAtMs = Date.now();
 
     do {
@@ -87,6 +91,7 @@ export class StatusHandlerService {
 
       try {
         const rawStatus = await endpoint.status(runpodId);
+        consecutiveNotFound = 0;
 
         if (isPublicEndpoint) {
           const publicStatus = rawStatus as PublicEndpointResponse;
@@ -191,17 +196,25 @@ export class StatusHandlerService {
           await job.log(`${new Date().toISOString()}: ${logMessage}`);
         }
       } catch (error: any) {
+        if (isRunpodJobNotFound(error)) {
+          consecutiveNotFound += 1;
+          if (consecutiveNotFound >= MAX_CONSECUTIVE_NOT_FOUND) {
+            const message = `RunPod job ${runpodId} no longer exists on RunPod (its TTL or result retention expired)`;
+            await job.log(`${new Date().toISOString()}: ${message}`);
+            throw new Error(message);
+          }
+        }
         console.error('Error getting endpoint status:', error?.message ?? error);
       }
 
-      if (status?.status === 'FAILED') {
-        await job.log(`${new Date().toISOString()}: Remote job FAILED: ${JSON.stringify(status)}`);
+      if (status && RUNPOD_FAILURE_STATUSES.has(status.status)) {
+        await job.log(`${new Date().toISOString()}: Remote job ${status.status}: ${JSON.stringify(status)}`);
         throw new Error(JSON.stringify(status));
       }
-      if (status?.completed === false && pollIntervalMs > 0) {
+      if (status?.completed !== true && pollIntervalMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       }
-    } while (status?.completed === false);
+    } while (status?.completed !== true);
 
     await this.throwIfStopped(endpoint, runpodId, job);
 
