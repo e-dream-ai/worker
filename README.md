@@ -78,16 +78,18 @@ The [engines](https://github.com/e-dream-ai/engines) repo has a JSON config and 
 
 ## RunPod endpoints CLI
 
-Lists every serverless endpoint on the RunPod account (alpha and stage) with its worker limits, live workers, queue and GPU stock, plus the account totals. It also points out likely reasons jobs are waiting and lets you change an endpoint's max workers from a menu. It needs `RUNPOD_API_KEY` in `worker/.env` and builds the worker before it runs.
+Lists every serverless endpoint on the RunPod account (alpha and stage) with its worker limits, live workers, queue and GPU stock, plus the account totals. It also points out likely reasons jobs are waiting and can change an endpoint's max workers. It builds the worker before it runs.
 
 ```bash
-npm run runpod             # status, then the menu
-npm run runpod -- --once   # status only
+npm run runpod                                   # status of every endpoint
+npm run runpod -- set-max alpha_deforum 8        # show what the change would do, nothing is applied
+npm run runpod -- set-max alpha_deforum 8 --yes  # apply it
 ```
 
-- To change an endpoint, pick **Change max workers on an endpoint**, choose the endpoint (type to filter), enter the new max and confirm. Nothing changes until you confirm.
+- `set-max` takes the endpoint name or id and only changes anything with `--yes`. Max workers can't go below the endpoint's min workers.
 - **Total max workers** adds up every endpoint's max and compares it with the account cap. Raise the cap in the RunPod console.
 - Columns: `RUN` workers busy with a job, `IDLE` workers ready for one, `INIT` workers starting, `THRTL` workers waiting for a free GPU, `UNHLTH` workers failing health checks, `QUEUE` jobs waiting. `GPU STOCK` is the best serverless availability across the endpoint's GPU pools.
+- It reads `RUNPOD_API_KEY` from `worker/.env`, but a `RUNPOD_API_KEY` already set in your shell wins. The key needs the `serverless:read` scope, plus `serverless:write` for `set-max`; a key restricted to running endpoints is not enough.
 
 ## Marketing Email CLI
 

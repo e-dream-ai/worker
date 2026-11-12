@@ -108,3 +108,15 @@ export function planMaxChange(snapshot: Snapshot, endpoint: Endpoint, to: number
   const overCapBy = cap !== null && to > from ? Math.max(0, totalAfter - cap) : 0;
   return { endpoint, from, to, totalBefore: totalMax, totalAfter, cap, overCapBy };
 }
+
+export function findEndpoint({ endpoints }: Snapshot, ref: string): Endpoint {
+  const query = ref.trim().toLowerCase();
+  const all = endpoints.map(({ endpoint }) => endpoint);
+  const match = all.find(({ id, name }) => id.toLowerCase() === query || name.toLowerCase() === query);
+  if (match) return match;
+
+  const names = all.map(({ name }) => name);
+  const similar = names.filter((name) => name.toLowerCase().includes(query));
+  const hint = similar.length > 0 ? `Did you mean: ${similar.join(', ')}` : `Endpoints: ${names.join(', ')}`;
+  throw new Error(`No endpoint named or with id "${ref}". ${hint}`);
+}

@@ -1,40 +1,71 @@
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from '@commander-js/extra-typings';
 import env from './shared/env.js';
 import { RunpodAdminClient } from './runpod-admin/client.js';
-import { runMenu } from './runpod-admin/menu.js';
-import { renderReport } from './runpod-admin/render.js';
+import { renderPlan, renderReport, type RenderOptions } from './runpod-admin/render.js';
+import { findEndpoint, planMaxChange } from './runpod-admin/report.js';
 import { errorMessage } from './runpod-admin/result.js';
 import { loadSnapshot } from './runpod-admin/snapshot.js';
 
-interface CliOptions {
-  readonly once: boolean;
+const renderOptions: RenderOptions = {
+  color: Boolean(process.stdout.isTTY) && process.stdout.hasColors(),
+};
+
+function parseWorkerCount(value: string): number {
+  const count = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(count)) {
+    throw new InvalidArgumentError('Expected a whole number of workers.');
+  }
+  return count;
+}
+
+async function printStatus(): Promise<void> {
+  const runpod = new RunpodAdminClient(env.RUNPOD_API_KEY);
+  console.log(renderReport(await loadSnapshot(runpod), renderOptions));
+}
+
+async function changeMaxWorkers(endpointRef: string, max: number, apply: boolean): Promise<void> {
+  const runpod = new RunpodAdminClient(env.RUNPOD_API_KEY);
+  const snapshot = await loadSnapshot(runpod);
+  const endpoint = findEndpoint(snapshot, endpointRef);
+  const { min, max: currentMax } = endpoint.workers;
+
+  if (max < min) throw new Error(`Max workers can't be lower than min workers (${min}) on ${endpoint.name}.`);
+  if (max === currentMax) {
+    console.log(`${endpoint.name} already has max workers ${max}, nothing to change.`);
+    return;
+  }
+
+  console.log(renderPlan(planMaxChange(snapshot, endpoint, max), renderOptions));
+  if (!apply) {
+    console.log('Dry run, nothing changed. Run it again with --yes to apply.');
+    return;
+  }
+
+  const updated = await runpod.setMaxWorkers(endpoint.id, max);
+  console.log(`Updated ${updated.name}: max workers is now ${updated.workers.max}.`);
 }
 
 const program = new Command()
   .name('runpod')
   .description('Show RunPod serverless endpoints, their worker limits and why jobs are waiting, and change max workers')
-  .option('--once', 'print the status and exit without opening the menu', false)
-  .parse();
+  .showHelpAfterError();
 
-const isPromptExit = (error: unknown): boolean => error instanceof Error && error.name === 'ExitPromptError';
+program
+  .command('status', { isDefault: true })
+  .description('print every endpoint with its workers, queue and GPU stock, plus account totals and likely problems')
+  .action(printStatus);
 
-async function main({ once }: CliOptions): Promise<void> {
-  const runpod = new RunpodAdminClient(env.RUNPOD_API_KEY);
-  const color = Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined;
-  const interactive = !once && Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
-
-  if (interactive) {
-    await runMenu(runpod, { color });
-  } else {
-    console.log(renderReport(await loadSnapshot(runpod), { color }));
-  }
-}
+program
+  .command('set-max')
+  .description('change the max workers of an endpoint; shows the change and only applies it with --yes')
+  .argument('<endpoint>', 'endpoint name or id')
+  .argument('<max>', 'new max workers', parseWorkerCount)
+  .option('-y, --yes', 'apply the change instead of only showing it', false)
+  .action((endpointRef, max, { yes }) => changeMaxWorkers(endpointRef, max, yes));
 
 try {
-  await main(program.opts<CliOptions>());
+  await program.parseAsync();
 } catch (error) {
-  if (!isPromptExit(error)) {
-    console.error(errorMessage(error));
-    process.exitCode = 1;
-  }
+  console.error(`error: ${errorMessage(error)}`);
+  process.exitCode = 1;
 }
