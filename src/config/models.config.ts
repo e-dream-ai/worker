@@ -88,6 +88,12 @@ export const WORKER_MODELS: Record<string, WorkerModelConfig> = {
     endpoint: 'fal-ai/krea-2/turbo/style',
     inputImage: true,
   },
+  'krea-2-large': {
+    id: 'krea-2-large',
+    provider: 'fal',
+    mediaType: 'image',
+    endpoint: 'krea/v2/large/text-to-image',
+  },
 };
 
 export function getModelConfig(modelId: string | undefined): WorkerModelConfig {

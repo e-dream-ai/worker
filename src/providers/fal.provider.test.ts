@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { getModelConfig } from '../config/models.config.js';
-import { buildKontextInput, falImageProvider } from './fal.provider.js';
+import { buildKontextInput, falImageProvider, nearestKreaAspectRatio } from './fal.provider.js';
 
 const { submit } = vi.hoisted(() => ({ submit: vi.fn() }));
 
@@ -128,6 +128,57 @@ describe('fal image submission', () => {
       falImageProvider.submitImage('fal-ai/krea-2/turbo/style', { prompt: 'glowing' }, 'test-key')
     ).rejects.toThrow(/reference|source|image/i);
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  test('submits Krea 2 Large with an aspect ratio, seed and creativity, without Turbo-only fields', async () => {
+    const model = getModelConfig('krea-2-large');
+    const result = await falImageProvider.submitImage(
+      model.endpoint,
+      {
+        prompt: 'glowing',
+        width: 1280,
+        height: 720,
+        seed: 7,
+        creativity: 'high',
+        numImages: 1,
+        numInferenceSteps: 4,
+        promptExpansion: true,
+        styleScale: 2,
+      },
+      'test-key'
+    );
+
+    const input = { prompt: 'glowing', aspect_ratio: '16:9', seed: 7, creativity: 'high' };
+    expect(submit).toHaveBeenCalledWith('krea/v2/large/text-to-image', { input });
+    expect(result).toEqual({ requestId: 'request-1', submittedInput: input });
+  });
+
+  test('leaves Krea 2 Large aspect ratio, seed and creativity to fal when unset', async () => {
+    await falImageProvider.submitImage('krea/v2/large/text-to-image', { prompt: 'glowing', seed: -1 }, 'test-key');
+    expect(submit).toHaveBeenCalledWith('krea/v2/large/text-to-image', { input: { prompt: 'glowing' } });
+  });
+
+  test.each(['', 'extreme', 'High'])('rejects Krea 2 Large creativity %j before submitting', async (creativity) => {
+    await expect(
+      falImageProvider.submitImage('krea/v2/large/text-to-image', { prompt: 'glowing', creativity }, 'test-key')
+    ).rejects.toThrow(/creativity/);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    [1024, 1024, '1:1'],
+    [1024, 768, '4:3'],
+    [1152, 768, '3:2'],
+    [1280, 720, '16:9'],
+    [1280, 544, '2.35:1'],
+    [1024, 1280, '4:5'],
+    [768, 1152, '2:3'],
+    [720, 1280, '9:16'],
+    [768, 1024, '4:5'],
+    [512, 512, '1:1'],
+    [3000, 1000, '2.35:1'],
+  ])('maps %ix%i to Krea aspect ratio %s', (width, height, ratio) => {
+    expect(nearestKreaAspectRatio(width, height)).toBe(ratio);
   });
 
   test('retains FLUX Schnell inference steps', async () => {

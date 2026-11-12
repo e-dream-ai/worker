@@ -17,6 +17,7 @@ export interface NormalizedImageInput {
   imageUrl?: string; // source image for editing or a style reference
   promptExpansion?: boolean; // Krea: fal rewrites the prompt with an LLM before generating
   styleScale?: number; // Krea Style: strength of the style reference, 0-4
+  creativity?: string; // Krea 2 Large: raw, low, medium or high
 }
 
 export interface ProviderSubmitResult {
