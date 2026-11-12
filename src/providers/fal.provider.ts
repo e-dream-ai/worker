@@ -272,15 +272,18 @@ export const falImageProvider: ImageProvider = {
 
   async pollImage(endpoint, requestId, apiKey): Promise<ProviderImagePollResult> {
     const { status, completed, result, logs } = await resultFromFal(endpoint, requestId, apiKey, (data) => {
-      const urls = ((data as { images?: Array<{ url?: string }> })?.images ?? [])
-        .map((image) => image?.url)
-        .filter((url): url is string => Boolean(url));
-      return urls.length > 0 ? urls : undefined;
+      const output = data as { images?: Array<{ url?: string }>; actual_prompt?: unknown } | undefined;
+      const urls = (output?.images ?? []).map((image) => image?.url).filter((url): url is string => Boolean(url));
+      if (urls.length === 0) return undefined;
+      // Krea Turbo returns the expanded prompt here when prompt expansion is on.
+      const actualPrompt =
+        typeof output?.actual_prompt === 'string' && output.actual_prompt.trim() ? output.actual_prompt : undefined;
+      return { urls, actualPrompt };
     });
     if (completed && !result) {
       throw new Error(`fal request ${requestId} completed but returned no image url`);
     }
-    return { status, completed, imageUrls: result, logs };
+    return { status, completed, imageUrls: result?.urls, actualPrompt: result?.actualPrompt, logs };
   },
 
   cancel: cancelFal,

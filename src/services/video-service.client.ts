@@ -5,6 +5,7 @@ import { Readable } from 'stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import env from '../shared/env.js';
+import { withActualPrompt } from '../utils/actual-prompt.js';
 import redisClient from '../shared/redis.js';
 
 interface DreamInfo {
@@ -14,6 +15,7 @@ interface DreamInfo {
     cognitoId?: string;
   };
   mediaType?: string;
+  prompt?: string | null;
   video?: string | null;
   original_video?: string | null;
   processedMediaWidth?: number | null;
@@ -78,14 +80,16 @@ export class VideoServiceClient {
     dreamUuid: string,
     imageUrl: string,
     renderDuration?: number,
-    run?: JobRunContext
+    run?: JobRunContext,
+    actualPrompt?: string
   ): Promise<void> {
     try {
       const dream = await this.getDreamInfo(dreamUuid);
       const userIdentifier = dream.user.cognitoId || dream.user.uuid;
 
       const { r2Path, extension } = await this.uploadImageToR2(imageUrl, dreamUuid, userIdentifier);
-      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image', renderDuration);
+      const prompt = actualPrompt ? withActualPrompt(dream.prompt, actualPrompt) : undefined;
+      await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image', renderDuration, prompt);
 
       await this.queueIngestion(dreamUuid, 'image', extension, run);
     } catch (error: any) {
@@ -171,7 +175,8 @@ export class VideoServiceClient {
     dreamUuid: string,
     r2Path: string,
     mediaType?: string,
-    renderDuration?: number
+    renderDuration?: number,
+    prompt?: string
   ): Promise<void> {
     const updateData: any = {
       original_video: r2Path,
@@ -184,6 +189,10 @@ export class VideoServiceClient {
 
     if (mediaType) {
       updateData.mediaType = mediaType;
+    }
+
+    if (prompt !== undefined) {
+      updateData.prompt = prompt;
     }
 
     await axios.put(`${this.backendUrl}/dream/${dreamUuid}`, updateData, {

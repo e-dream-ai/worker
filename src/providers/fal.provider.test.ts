@@ -2,16 +2,46 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { getModelConfig } from '../config/models.config.js';
 import { buildKontextInput, falImageProvider, nearestKreaAspectRatio } from './fal.provider.js';
 
-const { submit } = vi.hoisted(() => ({ submit: vi.fn() }));
+const { submit, status, result } = vi.hoisted(() => ({ submit: vi.fn(), status: vi.fn(), result: vi.fn() }));
 
 vi.mock('@fal-ai/client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@fal-ai/client')>()),
-  createFalClient: () => ({ queue: { submit } }),
+  createFalClient: () => ({ queue: { submit, status, result } }),
 }));
 
 beforeEach(() => {
   submit.mockReset();
   submit.mockResolvedValue({ request_id: 'request-1' });
+  status.mockReset();
+  status.mockResolvedValue({ status: 'COMPLETED' });
+  result.mockReset();
+});
+
+describe('fal image polling', () => {
+  test('returns the expanded prompt Krea Turbo used', async () => {
+    result.mockResolvedValue({
+      data: { images: [{ url: 'https://fal/1.png' }], prompt: 'a cat', actual_prompt: 'a sleek tabby cat at dusk' },
+    });
+    await expect(falImageProvider.pollImage('fal-ai/krea-2/turbo', 'request-1', 'test-key')).resolves.toMatchObject({
+      completed: true,
+      imageUrls: ['https://fal/1.png'],
+      actualPrompt: 'a sleek tabby cat at dusk',
+    });
+  });
+
+  test.each([null, '', '  ', undefined])('leaves actualPrompt unset when fal returns %j', async (actualPrompt) => {
+    result.mockResolvedValue({ data: { images: [{ url: 'https://fal/1.png' }], actual_prompt: actualPrompt } });
+    const poll = await falImageProvider.pollImage('fal-ai/krea-2/turbo', 'request-1', 'test-key');
+    expect(poll.imageUrls).toEqual(['https://fal/1.png']);
+    expect(poll.actualPrompt).toBeUndefined();
+  });
+
+  test('still fails a completed request with no image', async () => {
+    result.mockResolvedValue({ data: { images: [], actual_prompt: 'a tabby' } });
+    await expect(falImageProvider.pollImage('fal-ai/krea-2/turbo', 'request-1', 'test-key')).rejects.toThrow(
+      /no image url/
+    );
+  });
 });
 
 describe('buildKontextInput', () => {
