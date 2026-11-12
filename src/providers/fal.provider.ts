@@ -198,6 +198,49 @@ function buildKreaStyleInput(input: NormalizedImageInput): Record<string, unknow
   return body;
 }
 
+// Krea 2 Large on fal takes one of these aspect ratios instead of a size, picks
+// its own resolution, makes one image per request and has no prompt expansion.
+const KREA_V2_ASPECT_RATIOS = [
+  { name: '1:1', ratio: 1 },
+  { name: '4:3', ratio: 4 / 3 },
+  { name: '3:2', ratio: 3 / 2 },
+  { name: '16:9', ratio: 16 / 9 },
+  { name: '2.35:1', ratio: 2.35 },
+  { name: '4:5', ratio: 4 / 5 },
+  { name: '2:3', ratio: 2 / 3 },
+  { name: '9:16', ratio: 9 / 16 },
+] as const;
+
+const KREA_V2_CREATIVITY = ['raw', 'low', 'medium', 'high'] as const;
+
+export function nearestKreaAspectRatio(width: number, height: number): string {
+  const target = Math.log(width / height);
+  let best: (typeof KREA_V2_ASPECT_RATIOS)[number] = KREA_V2_ASPECT_RATIOS[0];
+  for (const candidate of KREA_V2_ASPECT_RATIOS) {
+    if (Math.abs(Math.log(candidate.ratio) - target) < Math.abs(Math.log(best.ratio) - target)) {
+      best = candidate;
+    }
+  }
+  return best.name;
+}
+
+function buildKreaV2Input(input: NormalizedImageInput): Record<string, unknown> {
+  const body: Record<string, unknown> = { prompt: input.prompt };
+  if (typeof input.width === 'number' && typeof input.height === 'number' && input.width > 0 && input.height > 0) {
+    body.aspect_ratio = nearestKreaAspectRatio(input.width, input.height);
+  }
+  if (typeof input.seed === 'number' && input.seed >= 0) {
+    body.seed = input.seed;
+  }
+  if (input.creativity !== undefined) {
+    if (!(KREA_V2_CREATIVITY as readonly string[]).includes(input.creativity)) {
+      throw new Error(`Krea 2 creativity must be one of ${KREA_V2_CREATIVITY.join(', ')}`);
+    }
+    body.creativity = input.creativity;
+  }
+  return body;
+}
+
 export const falImageProvider: ImageProvider = {
   name: 'fal',
 
@@ -207,6 +250,8 @@ export const falImageProvider: ImageProvider = {
         return submitToFal(endpoint, buildKreaInput(input), apiKey);
       case 'fal-ai/krea-2/turbo/style':
         return submitToFal(endpoint, buildKreaStyleInput(input), apiKey);
+      case 'krea/v2/large/text-to-image':
+        return submitToFal(endpoint, buildKreaV2Input(input), apiKey);
       default:
         return submitToFal(endpoint, input.imageUrl ? buildKontextInput(input) : buildFluxInput(input), apiKey);
     }
