@@ -276,9 +276,8 @@ export const falImageProvider: ImageProvider = {
       const urls = (output?.images ?? []).map((image) => image?.url).filter((url): url is string => Boolean(url));
       if (urls.length === 0) return undefined;
       // Krea Turbo returns the expanded prompt here when prompt expansion is on.
-      const actualPrompt =
-        typeof output?.actual_prompt === 'string' && output.actual_prompt.trim() ? output.actual_prompt : undefined;
-      return { urls, actualPrompt };
+      const actualPrompt = typeof output?.actual_prompt === 'string' ? output.actual_prompt.trim() : '';
+      return { urls, actualPrompt: actualPrompt || undefined };
     });
     if (completed && !result) {
       throw new Error(`fal request ${requestId} completed but returned no image url`);

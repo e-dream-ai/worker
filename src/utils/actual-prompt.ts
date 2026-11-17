@@ -1,9 +1,19 @@
 /**
- * Adds the prompt a provider actually used (fal's `actual_prompt`, set when
- * Krea prompt expansion rewrote it) to a dream's prompt JSON. Returns the new
- * prompt string, or undefined when the dream's prompt is not a JSON object.
+ * Brings `actual_prompt` in a dream's prompt JSON in line with its latest
+ * render: sets it to the prompt the provider actually used (fal's
+ * `actual_prompt`, when Krea prompt expansion rewrote it), or removes one left
+ * from an earlier render. Returns the new prompt string, or undefined when
+ * nothing changes or the dream's prompt is not a JSON object.
  */
-export function withActualPrompt(prompt: unknown, actualPrompt: string): string | undefined {
+export function withActualPrompt(prompt: unknown, actualPrompt: string | undefined): string | undefined {
+  const params = parsePromptObject(prompt);
+  if (!params || params.actual_prompt === actualPrompt) {
+    return undefined;
+  }
+  return JSON.stringify({ ...params, actual_prompt: actualPrompt });
+}
+
+function parsePromptObject(prompt: unknown): Record<string, unknown> | undefined {
   let params: unknown = prompt;
   if (typeof prompt === 'string') {
     try {
@@ -12,8 +22,9 @@ export function withActualPrompt(prompt: unknown, actualPrompt: string): string 
       return undefined;
     }
   }
-  if (!params || typeof params !== 'object' || Array.isArray(params)) {
-    return undefined;
-  }
-  return JSON.stringify({ ...params, actual_prompt: actualPrompt });
+  return isRecord(params) ? params : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
