@@ -924,12 +924,10 @@ export async function handleQwenImageJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.qwenImage, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    await videoServiceClient.uploadGeneratedImage(
-      dream_uuid,
-      result.r2_url,
-      result.render_duration,
-      getJobRunContext(job)
-    );
+    await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, {
+      renderDuration: result.render_duration,
+      run: getJobRunContext(job),
+    });
   } else if (dream_uuid) {
     console.error(`[handleQwenImageJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,
@@ -999,12 +997,10 @@ export async function handleZImageTurboJob(job: Job): Promise<any> {
   const result = await statusHandler.handleStatus(endpoints.zImageTurbo, runpodId, job);
 
   if (dream_uuid && auto_upload !== false && result?.r2_url) {
-    await videoServiceClient.uploadGeneratedImage(
-      dream_uuid,
-      result.r2_url,
-      result.render_duration,
-      getJobRunContext(job)
-    );
+    await videoServiceClient.uploadGeneratedImage(dream_uuid, result.r2_url, {
+      renderDuration: result.render_duration,
+      run: getJobRunContext(job),
+    });
   } else if (dream_uuid) {
     console.error(`[handleZImageTurboJob] Upload skipped for dream ${dream_uuid}:`, {
       has_dream_uuid: !!dream_uuid,

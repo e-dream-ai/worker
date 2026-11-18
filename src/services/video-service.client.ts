@@ -5,6 +5,7 @@ import { Readable } from 'stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import env from '../shared/env.js';
+import { withActualPrompt } from '../utils/actual-prompt.js';
 import redisClient from '../shared/redis.js';
 
 interface DreamInfo {
@@ -14,10 +15,17 @@ interface DreamInfo {
     cognitoId?: string;
   };
   mediaType?: string;
+  prompt?: unknown;
   video?: string | null;
   original_video?: string | null;
   processedMediaWidth?: number | null;
   processedMediaHeight?: number | null;
+}
+
+export interface GeneratedImageUploadOptions {
+  renderDuration?: number;
+  run?: JobRunContext;
+  actualPrompt?: string;
 }
 
 export class VideoServiceClient {
@@ -77,8 +85,7 @@ export class VideoServiceClient {
   async uploadGeneratedImage(
     dreamUuid: string,
     imageUrl: string,
-    renderDuration?: number,
-    run?: JobRunContext
+    { renderDuration, run, actualPrompt }: GeneratedImageUploadOptions = {}
   ): Promise<void> {
     try {
       const dream = await this.getDreamInfo(dreamUuid);
@@ -88,6 +95,7 @@ export class VideoServiceClient {
       await this.updateDreamOriginalVideo(dreamUuid, r2Path, 'image', renderDuration);
 
       await this.queueIngestion(dreamUuid, 'image', extension, run);
+      await this.syncActualPrompt(dreamUuid, dream.prompt, actualPrompt);
     } catch (error: any) {
       console.error(`Failed to upload generated image for dream ${dreamUuid}:`, {
         message: error.message,
@@ -186,11 +194,30 @@ export class VideoServiceClient {
       updateData.mediaType = mediaType;
     }
 
-    await axios.put(`${this.backendUrl}/dream/${dreamUuid}`, updateData, {
+    await this.putDream(dreamUuid, updateData);
+  }
+
+  private async syncActualPrompt(dreamUuid: string, prompt: unknown, actualPrompt: string | undefined): Promise<void> {
+    const nextPrompt = withActualPrompt(prompt, actualPrompt);
+    if (nextPrompt === undefined) return;
+
+    try {
+      await this.putDream(dreamUuid, { prompt: nextPrompt }, 10000);
+    } catch (error: unknown) {
+      console.warn(
+        `Failed to save the actual prompt for dream ${dreamUuid}:`,
+        axios.isAxiosError(error) ? { message: error.message, status: error.response?.status } : error
+      );
+    }
+  }
+
+  private async putDream(dreamUuid: string, body: Record<string, unknown>, timeout?: number): Promise<void> {
+    await axios.put(`${this.backendUrl}/dream/${dreamUuid}`, body, {
       headers: {
         Authorization: `Api-Key ${this.backendApiKey}`,
         'Content-Type': 'application/json',
       },
+      timeout,
     });
   }
 

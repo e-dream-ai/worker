@@ -192,12 +192,23 @@ export async function handleFalImageJob(job: Job): Promise<unknown> {
   if (!imageUrl) {
     throw new Error(`fal request ${requestId} finished without an image url`);
   }
+  // Kept only when the provider changed the prompt (Krea prompt expansion).
+  const actualPrompt = final.actualPrompt === prompt.trim() ? undefined : final.actualPrompt;
 
   if (dream_uuid && auto_upload !== false) {
-    await videoServiceClient.uploadGeneratedImage(dream_uuid, imageUrl, renderDurationMs, getJobRunContext(job));
+    await videoServiceClient.uploadGeneratedImage(dream_uuid, imageUrl, {
+      renderDuration: renderDurationMs,
+      run: getJobRunContext(job),
+      actualPrompt,
+    });
   }
 
-  return { status: 'COMPLETED', image_url: imageUrl, render_duration: renderDurationMs };
+  return {
+    status: 'COMPLETED',
+    image_url: imageUrl,
+    render_duration: renderDurationMs,
+    actual_prompt: actualPrompt,
+  };
 }
 
 function resolveCfgScale(

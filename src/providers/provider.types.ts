@@ -45,6 +45,7 @@ export interface ProviderImagePollResult {
   status: ProviderStatus;
   completed: boolean;
   imageUrls?: string[];
+  actualPrompt?: string; // the prompt the provider generated from, when it rewrote ours
   renderDurationMs?: number;
   logs?: ProviderLogEntry[];
 }
